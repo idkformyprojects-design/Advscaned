@@ -105,6 +105,13 @@ jobs:
         run: node scripts/seed.mjs
 
       - name: Publish public config
+        working-directory: functions
+        env:
+          GCLOUD_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+          RAZORPAY_KEY_ID: ${{ vars.RAZORPAY_KEY_ID }}
+        run: node scripts/public-config.mjs
+
+      - name: Links
         run: |
           echo "Website: https://$PROJECT.web.app"
           echo "Privacy policy (for Play Console): https://$PROJECT.web.app/legal/privacy"
