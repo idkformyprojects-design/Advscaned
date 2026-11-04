@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Ad photos: anyone can view; only the owner can upload, images only, max 4 MB.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /ads/{uid}/{file} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,178 @@
+rules_version = '2';
+
+// Bazaar — Firestore security rules.
+// The app talks to Firestore directly, so these rules ARE the access control.
+// Anything that must not be forged (ratings, save counts, boosts, roles, bans,
+// notifications, payments) is written only by Cloud Functions (admin SDK bypasses rules).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function me() { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function notBanned() {
+      return !exists(/databases/$(database)/documents/users/$(uid())) || me().get('banned', false) != true;
+    }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function blockedEitherWay(other) {
+      return exists(/databases/$(database)/documents/users/$(other)/blocks/$(uid()))
+        || exists(/databases/$(database)/documents/users/$(uid())/blocks/$(other));
+    }
+    function isText(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+
+    /* ------------------------------- config -------------------------------- */
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    /* -------------------------------- users -------------------------------- */
+    match /users/{userId} {
+      // Public seller profile (name, rating, joined…). No email or phone is stored here.
+      allow read: if true;
+      allow create: if signedIn() && uid() == userId
+        && request.resource.data.keys().hasOnly(['name', 'area', 'avatarColor', 'photoURL', 'createdAt'])
+        && isText(request.resource.data.name, 1, 40);
+      allow update: if signedIn() && uid() == userId
+        && changed().hasOnly(['name', 'area', 'avatarColor', 'photoURL'])
+        && isText(request.resource.data.name, 1, 40)
+        && isText(request.resource.data.area, 2, 40);
+      allow delete: if false;
+
+      match /favorites/{adId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create: if signedIn() && uid() == userId
+          && request.resource.data.keys().hasOnly(['adId', 'createdAt'])
+          && request.resource.data.adId == adId;
+      }
+      match /blocks/{otherId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create: if signedIn() && uid() == userId && otherId != userId;
+      }
+      match /tokens/{token} {
+        allow read, write: if signedIn() && uid() == userId;
+      }
+      match /notifications/{id} {
+        allow read: if signedIn() && uid() == userId;
+        allow update: if signedIn() && uid() == userId && changed().hasOnly(['read']);
+        allow create, delete: if false;
+      }
+    }
+
+    /* --------------------------------- ads --------------------------------- */
+    match /ads/{adId} {
+      function publicAd(d) { return d.status in ['active', 'sold']; }
+      function validAd(d) {
+        return isText(d.title, 8, 70)
+          && d.description is string && d.description.size() <= 1200
+          && d.price is int && d.price >= 0 && d.price <= 1000000000
+          && d.category in ['cars', 'mobiles', 'properties', 'bikes', 'electronics', 'furniture',
+                            'fashion', 'jobs', 'pets', 'services', 'sports', 'books']
+          && d.condition in ['new', 'like-new', 'good', 'fair']
+          && isText(d.area, 2, 40)
+          && d.images is list && d.images.size() <= 6
+          && d.attributes is map;
+      }
+      // Fields only Cloud Functions may set.
+      function serverFields() {
+        return ['sellerId', 'views', 'saves', 'featured', 'boosted', 'boostedUntil'];
+      }
+
+      allow read: if publicAd(resource.data)
+        || (signedIn() && resource.data.sellerId == uid())
+        || isAdmin();
+
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.sellerId == uid()
+        && request.resource.data.status in ['active', 'draft']
+        && request.resource.data.views == 0
+        && request.resource.data.saves == 0
+        && request.resource.data.featured == false
+        && request.resource.data.boosted == false
+        && validAd(request.resource.data);
+
+      // Owner edits: never the server-managed fields, never out of review/removal.
+      allow update: if signedIn() && notBanned()
+        && resource.data.sellerId == uid()
+        && !(resource.data.status in ['pending', 'removed'])
+        && request.resource.data.status in ['active', 'sold', 'draft']
+        && !changed().hasAny(serverFields())
+        && validAd(request.resource.data);
+
+      // Anyone signed in may count a view: views +1 and nothing else.
+      allow update: if signedIn()
+        && publicAd(resource.data)
+        && changed().hasOnly(['views'])
+        && request.resource.data.views == resource.data.views + 1;
+
+      allow delete: if signedIn() && resource.data.sellerId == uid();
+    }
+
+    /* -------------------------------- chats -------------------------------- */
+    match /chats/{chatId} {
+      function participant(d) { return signedIn() && uid() in d.participants; }
+
+      allow read: if participant(resource.data);
+      // Chat id is "<adId>_<buyerUid>": one conversation per buyer per ad.
+      allow create: if signedIn() && notBanned()
+        && request.resource.data.buyerId == uid()
+        && chatId == request.resource.data.adId + '_' + uid()
+        && request.resource.data.sellerId != uid()
+        && request.resource.data.participants == [uid(), request.resource.data.sellerId]
+        && get(/databases/$(database)/documents/ads/$(request.resource.data.adId)).data.sellerId
+             == request.resource.data.sellerId
+        && !blockedEitherWay(request.resource.data.sellerId);
+      allow update, delete: if false;
+
+      match /messages/{messageId} {
+        function chat() { return get(/databases/$(database)/documents/chats/$(chatId)).data; }
+        allow read: if signedIn() && uid() in chat().participants;
+        allow create: if signedIn() && notBanned()
+          && uid() in chat().participants
+          && request.resource.data.senderId == uid()
+          && request.resource.data.kind in ['text', 'offer']
+          && isText(request.resource.data.text, 1, 2000)
+          && request.resource.data.readAt == null
+          && !blockedEitherWay(chat().buyerId == uid() ? chat().sellerId : chat().buyerId);
+        // The recipient marks messages read.
+        allow update: if signedIn() && uid() in chat().participants
+          && resource.data.senderId != uid()
+          && changed().hasOnly(['readAt']);
+        allow delete: if false;
+      }
+    }
+
+    /* ------------------------------- reviews ------------------------------- */
+    match /reviews/{reviewId} {
+      allow read: if true;
+      // One review per buyer per seller: id is "<sellerId>_<authorUid>".
+      allow create: if signedIn() && notBanned()
+        && reviewId == request.resource.data.sellerId + '_' + uid()
+        && request.resource.data.authorId == uid()
+        && request.resource.data.sellerId != uid()
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && isText(request.resource.data.text, 8, 400);
+      allow update, delete: if false;
+    }
+
+    /* ------------------------------- reports ------------------------------- */
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.reporterId == uid()
+        && request.resource.data.targetType in ['ad', 'seller']
+        && isText(request.resource.data.targetId, 1, 128)
+        && isText(request.resource.data.reason, 3, 200)
+        && request.resource.data.status == 'open';
+      allow update, delete: if false;
+    }
+
+    /* ------------------------------- payments ------------------------------ */
+    match /payments/{orderId} {
+      allow read: if signedIn() && resource.data.userId == uid();
+      allow write: if false;
+    }
+  }
+}
