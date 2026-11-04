@@ -10,11 +10,14 @@ Everything a new developer (or AI agent) needs to continue this project.
 Capacitor Android shell.
 
 - **Stack:** React 18 · TypeScript (strict) · Vite 5 · Tailwind 3.4 · Zustand (+persist) ·
-  React Router 6 · Framer Motion · lucide-react · Capacitor 7
-- **No backend.** The Zustand store is the data layer and persists to `localStorage`
-  (key `bazaar-store-v1`). Every flow is functional offline.
-- **Status:** feature-complete demo. 19 routes render, 41 interaction assertions pass, CI builds a real
-  debug APK on every push.
+  React Router 6 · Framer Motion · lucide-react · Capacitor 8 · **API:** Node 22 `node:http` +
+  `node:sqlite` (zero npm dependencies)
+- **Two modes, same UI.** Built *without* `VITE_API_URL` the Zustand store is the whole data layer
+  (persisted to `localStorage`, key `bazaar-store-v1`) and every flow works offline as a demo.
+  Built *with* `VITE_API_URL` the store stays the UI cache but every action is synced to the API in
+  `server/` (real accounts, OTP, photos, chat).
+- **Status:** feature-complete. 20 routes render, the interaction flows pass, 13 API tests and an
+  app↔API sync test pass, CI builds a debug APK on every push and a signed AAB/APK on `v*` tags.
 
 ---
 
@@ -28,9 +31,16 @@ npm run dev        # http://localhost:5173  (binds 0.0.0.0)
 Demo login: **any 10-digit phone number**, then OTP **`1234`**. No SMS is sent.
 
 ```bash
-npm run verify     # typecheck + smoke + flows + build  ← run this before committing
+npm run verify     # typecheck + smoke + flows + API tests + sync test + build  ← before committing
 npm run build
 npm run preview    # production build, service worker active
+```
+
+With the backend (needs Node 22.18+):
+
+```bash
+npm run server                               # API on :8787, demo OTP 1234
+VITE_API_URL=http://localhost:8787 npm run dev
 ```
 
 ---
@@ -56,14 +66,22 @@ src/
 │   ├── data.ts          CATEGORIES (+per-category form fields), SELLERS, AREAS
 │   ├── seed.ts          16 listings, chats, notifications, reviews, saved searches
 │   ├── store.ts         Zustand store + actions + toasts (useUI)
+│   ├── api.ts           typed API client — on only when VITE_API_URL is set
+│   ├── sync.ts          pushes store actions to the API, bootstrap + 5 s polling
 │   ├── hooks.ts         useSeller(id) — resolves "me" to the signed-in user
 │   ├── ai.ts            price suggestion, description writer, title hints, ranking
 │   ├── insights.ts      deterministic analytics, sparklines, funnel, seller tips
 │   ├── geo.ts           area coordinates, projection, haversine, pin labels
 │   └── utils.ts         INR formatting, timeAgo, image compression, share, cn()
-└── pages/               Home, SearchPage, AdDetail, PostAd, Chats, ChatThread, Favorites,
-                         SavedSearches, MyAds, Insights, Profile, Login, Notifications,
-                         SellerProfile, NotFound
+└── pages/               Home, SearchPage, AdDetail, PostAd (also /post/:id to edit), Chats,
+                         ChatThread, Favorites, SavedSearches, MyAds, Insights, Profile, Login,
+                         Notifications, SellerProfile, NotFound
+server/
+├── index.js             env config (see header comment), SMS sending, startup
+├── app.js               all routes, auth, validation, notifications
+├── db.js                SQLite schema + demo seeding from seed.json
+├── seed.json            regenerate with `npm run server:seed-json` after editing src/lib/seed.ts
+└── test/api.test.js     node:test suite
 ```
 
 ---
@@ -79,14 +97,20 @@ Important actions:
 
 | Action                                                              | Notes                                                                                                              |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `login(name, phone, area)`                                          | simulated; sets `onboarded`                                                                                        |
+| `login(name, phone, area)`                                          | offline mode only; API mode signs in via `api.verifyOtp` + `completeSignIn()` in sync.ts                            |
 | `createAd(ad)` / `updateAd` / `deleteAd`                            | ads created by the user use `sellerId: 'me'`                                                                       |
 | `boostAd(id)`                                                       | sets `featured` + `boosted`, pushes a notification                                                                 |
 | `dropPrice(id, price)`                                              | appends to `ad.priceHistory`, pushes a notification                                                                |
 | `startChat(adId)` → id                                              | reuses the existing chat for that ad if present                                                                    |
-| `sendMessage(chatId, text, kind)`                                   | appends message, then a **simulated seller reply** after ~1.4s (fires a browser notification if the tab is hidden) |
+| `sendMessage(chatId, text, kind)`                                   | appends message; offline → simulated seller reply after ~1.4s; API mode → sent to server, replies arrive by polling |
+| `blockSeller` / `unblockSeller` / `report`                          | block hides the seller's chats + ads; unblock from Profile                                                          |
 | `addReview(r)` / `addSavedSearch` / `toggleFavorite` / `markViewed` | …                                                                                                                  |
 | `resetDemo()`                                                       | restores seed data (Profile → Reset demo data)                                                                     |
+
+**API mode:** every mutating action calls `remote.*` in `src/lib/sync.ts` right after its optimistic
+`set()`. The server's id for the signed-in user is mapped to `'me'` (so `sellerId: 'me'` keeps working)
+and a chat's `sellerId` is always the *other* person. New actions that change shared data need a
+matching `remote.*` call and server route.
 
 **Resetting during development:** DevTools → Application → Local Storage → delete
 `bazaar-store-v1`, or use the in-app reset. Bump the `version` in `persist` if you change the shape.
@@ -109,7 +133,10 @@ Important actions:
 
 ```bash
 npm run smoke   # bundles src/main.tsx with esbuild, renders 19 routes in jsdom (guest + signed-in)
-npm run flows   # drives the real UI: sign-in, post, price drop, boost, map, reviews, chat, filters
+npm run flows   # drives the real UI: sign-in, post, price drop, boost, map, reviews, chat,
+                # chat search, report/block, draft → publish, filters
+npm run server:test  # API: auth, ads, favourites, chat, reviews, blocks, uploads
+npm run test:sync    # runs the real store + sync.ts against a live in-process API
 ```
 
 Both run against the actual bundle (`npm run test:bundle` builds `.tmp/smoke.mjs`). If you add a page,
@@ -125,35 +152,34 @@ the DOM globals list at the top of each script; add new ones there if a library 
 - CI (`.github/workflows/ci.yml`) builds `bazaar-debug-apk` on every push → Actions → Artifacts.
 - Locally: `npm run build && npx cap sync android && cd android && ./gradlew assembleDebug`.
 - After changing icons: `npm run icons` regenerates web PNGs **and** Android mipmaps.
-- Release build needs a keystore + `signingConfigs` (see README §1c).
+- Release signing is wired up: `npm run keystore` once, add the 3 secrets it prints, push a `v*`
+  tag → `.github/workflows/release.yml` publishes a signed AAB + APK (README §1d).
 
 ---
 
 ## 8. What is real vs. simulated
 
-| Real                                                    | Simulated / local                                |
-| ------------------------------------------------------- | ------------------------------------------------ |
-| All UI, routing, state transitions, filtering & ranking | Auth (any phone + OTP 1234)                      |
-| Image upload + client-side compression → data URLs      | Payments/boosts (no charge)                      |
-| Persistence across reloads                              | Seller replies (timed canned responses)          |
-| Service worker / offline shell / install prompt         | Analytics (`insights.ts` derives from seed math) |
-| CI build + APK packaging                                | Notifications (browser-only, no push backend)    |
+| Real (with the API)                                     | Still simulated / local                           |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| Phone OTP sign-in (Twilio or SMS webhook), sessions     | Payments for boosts (no charge yet)               |
+| Ads, drafts, edits, price history, boosts               | Analytics (`insights.ts` derives from seed math)  |
+| Photo upload + hosting                                  | Push notifications (browser-only, no FCM)         |
+| Favourites, price-drop alerts, notifications            | Chat is polled every 5 s, not WebSocket           |
+| Chat with offers + read receipts                        | Saved searches + recently viewed stay on-device   |
+| Reviews, reports, blocking                              | Map uses neighbourhood centroids                  |
 
----
+Offline mode (no `VITE_API_URL`) simulates everything in the left column too.
 
 ## 9. Suggested next steps (in order of value)
 
-1. **Backend**: Postgres + Prisma (or Firebase). Mirror `src/lib/types.ts` — it is already API-shaped.
-   Replace store action bodies with fetch calls; keep the store as a cache.
-2. **Auth**: phone OTP (MSG91/Twilio), JWT refresh, device sessions.
-3. **Realtime chat**: WebSocket/Firestore + FCM push + attachments.
-4. **Storage**: S3/Cloudinary for photos (drop the data-URL compression path).
-5. **Payments**: Razorpay for boosts/Safe Pay; server-side price-drop alerts.
-6. **Maps**: swap the hand-drawn `MapView` for Mapbox/Google with real coordinates.
-7. **Moderation**: report queue, image/text classifiers, duplicate detection.
-8. **Release**: signing key, `bundleRelease`, Play Store listing, privacy policy.
-
----
+1. **Deploy**: API on Render (`render.yaml`) or Docker; web on Vercel/Netlify/Cloudflare; set
+   `VITE_API_URL` (host settings + GitHub Actions variable).
+2. **Payments**: Razorpay for boosts — hook point marked in `POST /api/ads/:id/boost`.
+3. **Push**: FCM via `@capacitor/push-notifications` so replies arrive with the app closed.
+4. **Scale**: SQLite → Postgres and photos → S3/Cloudinary once one server isn't enough.
+5. **Moderation**: admin view over the `reports` table; image/text classifiers.
+6. **Maps**: real coordinates + radius search instead of `geo.ts` centroids.
+7. **Play Store listing**: privacy policy, screenshots, data-safety form.
 
 ## 10. Gotchas
 
@@ -161,8 +187,11 @@ the DOM globals list at the top of each script; add new ones there if a library 
   `wss` so proxied previews work. Change only if you change hosting.
 - `public/images/*.jpg` are generated listing photos (~5 MB) — keep them out of Git LFS demands.
 - `PriceLabel()` in `utils.ts` special-cases jobs (`/yr`), rent (`/mo`) and services (`from ₹`).
-- Ads created by the user have `sellerId: 'me'`; resolve sellers through `useSeller()`, never
-  `sellerById()` directly in components.
+- Ads created by the user have `sellerId: 'me'`; resolve sellers through `useSeller()`.
+  `sellerById()` is fine only for ids that can never be `'me'` (chat counterparts, block list);
+  in API mode it also knows real accounts via `registerSellers()`.
+- `src/lib` must stay *erasable* TypeScript (no enums, no constructor parameter properties) —
+  `test:sync` runs it directly with Node's type stripping.
 - Sheets lock `#app-scroll`, the app's real scroll container (body does not scroll).
 - Prettier config is committed — run `npx prettier --write "src/**/*.{ts,tsx,css}"` before pushing.
 
