@@ -25,6 +25,7 @@ import { toast, useStore } from '../lib/store';
 import type { CategoryId, Condition, Filters } from '../lib/types';
 import { cn, inr } from '../lib/utils';
 import { rankAds } from '../lib/ai';
+import { adDistance } from '../lib/geo';
 
 const SORTS: { id: Filters['sort']; label: string }[] = [
   { id: 'relevance', label: 'Recommended' },
@@ -112,7 +113,7 @@ export default function SearchPage() {
     if (minPrice) list = list.filter((a) => a.price >= minPrice);
     if (maxPrice) list = list.filter((a) => a.price <= maxPrice);
     if (conditions.length) list = list.filter((a) => conditions.includes(a.condition));
-    if (maxDistance) list = list.filter((a) => a.distanceKm <= maxDistance);
+    if (maxDistance) list = list.filter((a) => adDistance(a, area) <= maxDistance);
     if (verifiedOnly)
       list = list.filter((a) => a.sellerId === 'me' || sellerById(a.sellerId).verified);
     if (withPhotos) list = list.filter((a) => a.images.length > 0);
@@ -125,7 +126,7 @@ export default function SearchPage() {
       case 'price-desc':
         return [...list].sort((a, b) => b.price - a.price);
       case 'distance':
-        return [...list].sort((a, b) => a.distanceKm - b.distanceKm);
+        return [...list].sort((a, b) => adDistance(a, area) - adDistance(b, area));
       default:
         return [...list].sort(
           (a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.saves - a.saves,

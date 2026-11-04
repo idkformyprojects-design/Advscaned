@@ -25,7 +25,13 @@ const { openDb } = await import('../server/db.js');
 const { createApp } = await import('../server/app.js');
 const uploads = mkdtempSync(join(tmpdir(), 'bazaar-e2e-'));
 const db = openDb(':memory:');
-const handler = createApp({ db, devOtpCode: '1234', uploadsDir: uploads, demoReplyMs: 50 });
+const handler = createApp({
+  db,
+  devOtpCode: '1234',
+  uploadsDir: uploads,
+  demoReplyMs: 50,
+  adminPhones: ['+919830012345'],
+});
 const server = createServer(handler);
 await new Promise((r) => server.listen(0, r));
 process.env.VITE_API_URL = `http://127.0.0.1:${server.address().port}`;
@@ -72,6 +78,20 @@ try {
     'signed in with server account',
   );
   check(S().area === 'Ballygunge', 'area synced from account');
+  check(S().user?.role === 'admin', 'moderator role comes from the server');
+  check(
+    S().serverConfig?.payments === false,
+    'server config loaded (free boosts without Razorpay)',
+  );
+
+  // Distances are measured from the chosen area.
+  const { adDistance } = await import('../src/lib/geo.ts');
+  const ballygungeAd = S().ads.find((a) => a.area === 'Ballygunge');
+  const farAd = S().ads.find((a) => a.area === 'Rajarhat');
+  check(
+    adDistance(ballygungeAd, 'Ballygunge') < 2 && adDistance(farAd, 'Ballygunge') > 8,
+    `distances follow the chosen area (${adDistance(ballygungeAd, 'Ballygunge')} km vs ${adDistance(farAd, 'Ballygunge')} km)`,
+  );
 
   // Post an ad with a freshly taken photo (data URL) — it must be uploaded first.
   const png =
@@ -124,13 +144,14 @@ try {
   // Chat with a demo seller, who auto-replies; polling brings the reply in.
   const chatId = S().startChat('ad-3');
   S().sendMessage(chatId, 'Is the iPhone still available?');
-  const replied = await until(async () => {
-    await sync.refresh();
+  // No refresh() here: the reply must arrive through the live stream.
+  const replied = await until(() => {
     const c = S().chats.find((x) => x.id === chatId);
-    return c && c.messages.length >= 2;
-  }, 6000);
+    return !!c && c.messages.length >= 2;
+    // The fallback poll only runs 2.5 s after sending, so arriving sooner proves the stream works.
+  }, 2000);
   const chat = S().chats.find((x) => x.id === chatId);
-  check(replied, 'message delivered and seller reply received');
+  check(replied, 'message delivered and the reply arrived live (no polling)');
   check(
     chat?.sellerId === 'u2' && chat.messages[0].senderId === 'me',
     'chat mapped to me ↔ seller',
@@ -152,6 +173,16 @@ try {
     await until(async () => (await api.bootstrap()).reviews.some((r) => r.authorId === me.id)),
     'review stored on server',
   );
+  // Boost (free while Razorpay isn't configured) gets a 7-day end date.
+  S().boostAd('ad-e2e-1');
+  check(
+    await until(
+      () =>
+        (S().ads.find((a) => a.id === 'ad-e2e-1')?.boostedUntil ?? 0) > Date.now() + 6 * 86_400_000,
+    ),
+    'boost synced with a 7-day end date',
+  );
+
   S().blockSeller('u2');
   check(
     await until(async () => (await api.bootstrap()).blocked.includes('u2')),

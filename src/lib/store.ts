@@ -11,6 +11,7 @@ import type { Ad, AppNotification, Chat, Message, Review, SavedSearch, SessionUs
 import { sellerById } from './data';
 import { uid } from './utils';
 import { remote } from './sync';
+import type { ServerConfig } from './api';
 
 export type ToastKind = 'success' | 'error' | 'info';
 export interface Toast {
@@ -41,6 +42,8 @@ interface AppState {
   onboarded: boolean;
   installedHintDismissed: boolean;
   blockedSellers: string[];
+  /** Settings advertised by the API (payments on/off, boost price). Not persisted. */
+  serverConfig: ServerConfig | null;
   reports: {
     id: string;
     targetType: 'ad' | 'seller';
@@ -138,6 +141,7 @@ export const useStore = create<AppState>()(
       installedHintDismissed: false,
       blockedSellers: [],
       reports: [],
+      serverConfig: null,
 
       login: (name, phone, area) =>
         set((s) => ({

@@ -19,6 +19,7 @@ import Login from './pages/Login';
 import SellerProfile from './pages/SellerProfile';
 import Insights from './pages/Insights';
 import NotFound from './pages/NotFound';
+import Admin from './pages/Admin';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const user = useStore((s) => s.user);
@@ -118,6 +119,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Profile />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="admin"
+            element={
+              <RequireAuth>
+                <Admin />
               </RequireAuth>
             }
           />

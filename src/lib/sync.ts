@@ -14,6 +14,7 @@ import {
   ApiError,
   getToken,
   setToken,
+  streamUrl,
   type RemoteChat,
   type RemoteMe,
 } from './api';
@@ -22,12 +23,17 @@ import { toast, useStore } from './store';
 import type { Ad, Chat, Message } from './types';
 
 const POLL_MS = 5000;
+/** With the live stream connected, polling only runs as a safety net. */
+const POLL_WHEN_LIVE_MS = 30_000;
 const REFRESH_MS = 60_000;
 
 let cursor = 0;
 let pollTimer: number | undefined;
 let lastRefresh = 0;
+let lastPoll = 0;
 let started = false;
+let stream: EventSource | null = null;
+let streamLive = false;
 
 const active = () => apiEnabled && !!getToken();
 const myRemoteId = () => useStore.getState().user?.remoteId;
@@ -87,6 +93,7 @@ function sessionFrom(me: RemoteMe) {
     area: me.area,
     avatarColor: me.avatarColor,
     joined: me.joined,
+    role: me.role,
   };
 }
 
@@ -100,6 +107,7 @@ export async function refresh() {
     lastRefresh = Date.now();
     const state = useStore.getState();
     if (getToken() && !data.me) setToken(null);
+    useStore.setState({ serverConfig: data.config ?? null });
     if (data.me) {
       const prev = new Map(state.chats.map((c) => [c.id, c]));
       useStore.setState({
@@ -116,7 +124,9 @@ export async function refresh() {
         blockedSellers: data.blocked,
       });
       cursor = data.now;
+      connectStream();
     } else {
+      disconnectStream();
       useStore.setState({
         ads: data.ads,
         reviews: data.reviews,
@@ -134,8 +144,10 @@ export async function refresh() {
   }
 }
 
-async function poll() {
+async function poll(force = false) {
   if (!active() || (typeof document !== 'undefined' && document.hidden)) return;
+  if (!force && streamLive && Date.now() - lastPoll < POLL_WHEN_LIVE_MS) return;
+  lastPoll = Date.now();
   if (Date.now() - lastRefresh > REFRESH_MS) return refresh();
   try {
     const data = await api.updates(cursor);
@@ -168,6 +180,32 @@ function browserNotify(title: string, body: string) {
   }
 }
 
+/* ----------------------------- live stream ------------------------------ */
+
+/** Opens the server-sent-events stream; each `update` event triggers an immediate fetch. */
+function connectStream() {
+  if (stream || typeof EventSource === 'undefined') return;
+  const url = streamUrl();
+  if (!url) return;
+  const es = new EventSource(url);
+  stream = es;
+  es.addEventListener('ready', () => {
+    streamLive = true;
+  });
+  es.addEventListener('update', () => void poll(true));
+  es.onerror = () => {
+    streamLive = false;
+    // The browser retries on its own; if the server refused us (e.g. signed out), stop.
+    if (es.readyState === EventSource.CLOSED) disconnectStream();
+  };
+}
+
+function disconnectStream() {
+  stream?.close();
+  stream = null;
+  streamLive = false;
+}
+
 /** Call once at app start. No-op unless VITE_API_URL is configured. */
 export function startSync() {
   if (!apiEnabled || started) return;
@@ -182,6 +220,7 @@ export function startSync() {
 
 export function stopSync() {
   window.clearInterval(pollTimer);
+  disconnectStream();
   started = false;
 }
 
@@ -191,6 +230,72 @@ export async function completeSignIn(token: string, me: RemoteMe) {
   registerSellers([]);
   useStore.setState({ user: sessionFrom(me), area: me.area, onboarded: true });
   await refresh();
+}
+
+/* ------------------------------ payments --------------------------------- */
+
+type RazorpayResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+type RazorpayInstance = {
+  open: () => void;
+  on: (event: string, cb: (e: { error?: { description?: string } }) => void) => void;
+};
+type RazorpayCtor = new (options: Record<string, unknown>) => RazorpayInstance;
+
+let checkoutScript: Promise<RazorpayCtor> | null = null;
+function loadCheckout(): Promise<RazorpayCtor> {
+  const w = window as unknown as { Razorpay?: RazorpayCtor };
+  if (w.Razorpay) return Promise.resolve(w.Razorpay);
+  checkoutScript ??= new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    el.async = true;
+    el.onload = () =>
+      w.Razorpay ? resolve(w.Razorpay) : reject(new Error('Checkout failed to load'));
+    el.onerror = () => {
+      checkoutScript = null;
+      reject(new Error("Couldn't load the payment page — check your connection"));
+    };
+    document.head.appendChild(el);
+  });
+  return checkoutScript;
+}
+
+/**
+ * Paid boost: creates an order on our server, opens Razorpay Checkout (UPI, cards,
+ * netbanking, wallets), then has the server verify the signature before boosting.
+ */
+export async function payForBoost(adId: string): Promise<'paid' | 'cancelled'> {
+  const order = await api.boostOrder(adId);
+  const Razorpay = await loadCheckout();
+  const phone = (useStore.getState().user?.phone ?? '').replace(/\D/g, '').slice(-10);
+  return new Promise((resolve, reject) => {
+    const rzp = new Razorpay({
+      key: order.keyId,
+      amount: order.amount,
+      currency: order.currency,
+      order_id: order.orderId,
+      name: 'Bazaar',
+      description: order.description,
+      prefill: phone ? { contact: phone } : undefined,
+      theme: { color: '#0AA98C' },
+      handler: (res: RazorpayResponse) => {
+        api
+          .verifyPayment(res.razorpay_order_id, res.razorpay_payment_id, res.razorpay_signature)
+          .then(({ ad }) => {
+            replaceAd(adId, ad);
+            resolve('paid');
+          })
+          .catch(reject);
+      },
+      modal: { ondismiss: () => resolve('cancelled') },
+    });
+    rzp.on('payment.failed', (e) => reject(new Error(e.error?.description ?? 'Payment failed')));
+    rzp.open();
+  });
 }
 
 /* ------------------------------ uploads ---------------------------------- */
@@ -228,6 +333,7 @@ export const remote = {
 
   logout() {
     if (!apiEnabled) return;
+    disconnectStream();
     if (getToken()) void api.logout().catch(() => undefined);
     setToken(null);
     void refresh();

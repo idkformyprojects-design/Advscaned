@@ -256,7 +256,10 @@ describe('moderation', () => {
     assert.ok(r);
     assert.equal(r.openReportsOnTarget, 3);
     assert.equal(r.target.ad.title, 'Suspiciously cheap iPhone 15');
-    assert.equal((await call('GET', '/api/admin/stats', { token: admin.token })).data.underReview, 1);
+    assert.equal(
+      (await call('GET', '/api/admin/stats', { token: admin.token })).data.underReview,
+      1,
+    );
   });
 
   test('restore puts the ad back and closes its reports', async () => {
@@ -269,8 +272,12 @@ describe('moderation', () => {
     assert.equal((await call('GET', `/api/ads/${ad.id}`)).data.ad.status, 'active');
     const open = await call('GET', '/api/admin/reports', { token: admin.token });
     assert.ok(!open.data.reports.some((x) => x.targetId === ad.id));
-    const resolved = await call('GET', '/api/admin/reports?status=resolved', { token: admin.token });
-    assert.ok(resolved.data.reports.some((x) => x.targetId === ad.id && x.resolution === 'restored'));
+    const resolved = await call('GET', '/api/admin/reports?status=resolved', {
+      token: admin.token,
+    });
+    assert.ok(
+      resolved.data.reports.some((x) => x.targetId === ad.id && x.resolution === 'restored'),
+    );
   });
 
   test('remove takes an ad down for good', async () => {
@@ -298,7 +305,11 @@ describe('moderation', () => {
     const reporter = await signIn('Careful Carol');
     await call('POST', '/api/reports', {
       token: reporter.token,
-      body: { targetType: 'seller', targetId: spammer.user.id, reason: 'Asked for advance payment' },
+      body: {
+        targetType: 'seller',
+        targetId: spammer.user.id,
+        reason: 'Asked for advance payment',
+      },
     });
     const r = (await call('GET', '/api/admin/reports', { token: admin.token })).data.reports.find(
       (x) => x.targetId === spammer.user.id,

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MapPin, Navigation, X } from 'lucide-react';
-import { AREA_COORDS, MAP_BOUNDS, adCoords, pinLabel, project } from '../lib/geo';
+import { AREA_COORDS, MAP_BOUNDS, adCoords, adDistance, pinLabel, project } from '../lib/geo';
 import type { Ad } from '../lib/types';
 import { cn, inr, timeAgo } from '../lib/utils';
 import { AdThumb, FavoriteButton } from './AdCard';
@@ -255,7 +255,8 @@ export function MapView({ ads, userArea }: { ads: Ad[]; userArea: string }) {
                   <p className="text-[14px] font-extrabold">{inr(active.ad.price)}</p>
                   <p className="truncate text-[11.5px] font-medium">{active.ad.title}</p>
                   <p className="text-[10.5px] text-muted">
-                    {active.ad.area} · {active.ad.distanceKm} km · {timeAgo(active.ad.createdAt)}
+                    {active.ad.area} · {adDistance(active.ad, userArea)} km ·{' '}
+                    {timeAgo(active.ad.createdAt)}
                   </p>
                 </div>
                 <FavoriteButton adId={active.ad.id} />

@@ -26,3 +26,13 @@ services:
       # For a demo without SMS, set OTP_DEV_CODE=1234 instead (everyone's code is 1234).
       - key: OTP_DEV_CODE
         sync: false
+      # Paid boosts (leave empty for free boosts). Start with Razorpay test-mode keys.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      # Comma-separated mobile numbers that get the Moderation screen.
+      - key: ADMIN_PHONES
+        sync: false

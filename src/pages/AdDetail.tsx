@@ -25,7 +25,7 @@ import {
 import { AdCard, AdThumb, FavoriteButton, priceDrop } from '../components/AdCard';
 import { Avatar, Badge, EmptyState, Sheet } from '../components/ui';
 import { categoryById, conditionLabel } from '../lib/data';
-import { useSeller } from '../lib/hooks';
+import { useAdDistance, useSeller } from '../lib/hooks';
 import { suggestPrice } from '../lib/ai';
 import { toast, useStore } from '../lib/store';
 import { cn, inr, priceLabel, shareOrCopy, timeAgo, vibrate } from '../lib/utils';
@@ -62,6 +62,7 @@ export default function AdDetail() {
   }, [id]);
 
   const seller = useSeller(ad?.sellerId ?? 'u1');
+  const distance = useAdDistance();
 
   const insight = useMemo(() => {
     if (!ad) return null;
@@ -422,7 +423,7 @@ export default function AdDetail() {
                   </div>
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/40 to-transparent p-3 text-white">
                     <span className="text-[12.5px] font-semibold">
-                      {ad.area}, {ad.city} · {ad.distanceKm} km away
+                      {ad.area}, {ad.city} · {distance(ad)} km away
                     </span>
                     <ChevronRight size={16} />
                   </div>

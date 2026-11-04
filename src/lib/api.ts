@@ -73,6 +73,7 @@ export interface RemoteMe {
   area: string;
   avatarColor: string;
   joined: number;
+  role?: 'user' | 'admin';
 }
 export interface RemoteMessage {
   id: string;
@@ -103,7 +104,47 @@ export interface Bootstrap {
   chats: RemoteChat[];
   notifications: AppNotification[];
   blocked: string[];
+  config?: ServerConfig;
 }
+export interface ServerConfig {
+  payments: boolean;
+  boostPricePaise: number;
+  boostDays: number;
+}
+export interface BoostOrder {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  description: string;
+}
+export interface AdminStats {
+  users: number;
+  liveAds: number;
+  underReview: number;
+  openReports: number;
+  banned: number;
+  revenuePaise: number;
+}
+export interface AdminReport {
+  id: string;
+  targetType: 'ad' | 'seller';
+  targetId: string;
+  reason: string;
+  createdAt: number;
+  status: string;
+  resolution?: string | null;
+  resolvedAt?: number | null;
+  reporterName: string;
+  openReportsOnTarget: number;
+  target: {
+    kind: 'ad' | 'seller';
+    missing?: boolean;
+    ad?: Ad;
+    seller?: Seller & { banned: boolean };
+  };
+}
+export type ResolveAction = 'dismiss' | 'remove' | 'ban' | 'restore';
 export interface Updates {
   now: number;
   chats: RemoteChat[];
@@ -189,4 +230,27 @@ export const api = {
     ),
   markNotificationsRead: (id?: string) =>
     request<{ ok: true }>('POST', '/api/notifications/read', id ? { id } : {}),
+
+  boostOrder: (adId: string) =>
+    request<BoostOrder>('POST', `/api/ads/${encodeURIComponent(adId)}/boost/order`),
+  verifyPayment: (orderId: string, paymentId: string, signature: string) =>
+    request<{ ad: Ad; status: string }>('POST', '/api/payments/verify', {
+      orderId,
+      paymentId,
+      signature,
+    }),
+
+  adminStats: () => request<AdminStats>('GET', '/api/admin/stats'),
+  adminReports: (status: 'open' | 'resolved' = 'open') =>
+    request<{ reports: AdminReport[] }>('GET', `/api/admin/reports?status=${status}`),
+  resolveReport: (id: string, action: ResolveAction) =>
+    request<{ ok: true }>('POST', `/api/admin/reports/${encodeURIComponent(id)}/resolve`, {
+      action,
+    }),
+  unbanUser: (id: string) =>
+    request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/unban`),
 };
+
+/** URL for the live-updates stream (EventSource can't send an Authorization header). */
+export const streamUrl = () =>
+  token ? `${API_BASE}/api/stream?token=${encodeURIComponent(token)}` : null;

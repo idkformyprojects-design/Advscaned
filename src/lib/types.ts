@@ -14,7 +14,8 @@ export type CategoryId =
 
 export type Condition = 'new' | 'like-new' | 'good' | 'fair';
 
-export type AdStatus = 'active' | 'sold' | 'draft' | 'pending';
+/** pending = hidden while moderators review it; removed = taken down by moderators. */
+export type AdStatus = 'active' | 'sold' | 'draft' | 'pending' | 'removed';
 
 export interface Seller {
   id: string;
@@ -55,6 +56,8 @@ export interface Ad {
   warranty?: string;
   /** Every price the ad has carried, oldest first. */
   priceHistory?: { price: number; at: number }[];
+  /** When a paid boost ends (API mode). */
+  boostedUntil?: number;
 }
 
 export interface Message {
@@ -131,6 +134,8 @@ export interface SessionUser {
   joined: number;
   /** Account id on the Bazaar API when signed in against a backend. */
   remoteId?: string;
+  /** 'admin' unlocks the moderation screen (API mode). */
+  role?: 'user' | 'admin';
 }
 
 export const CATEGORY_ATTRS: Record<

@@ -100,6 +100,7 @@ App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView 
 - **Make an offer** flow (pre-filled suggestions) that posts a structured offer message.
 - **Phone reveal** with masking, safety reminders, **report seller** (reason picker) and **block / unblock** (hides their chats and ads).
 - Chat list search across seller names, item titles and messages.
+- **Distances** are measured from the neighbourhood you choose and drive "Near you", the distance filter and sorting.
 - Chat list with search, previews and per-chat badges.
 
 ### Account & growth
@@ -229,20 +230,31 @@ npm run server                    # http://localhost:8787  (demo OTP: 1234)
 VITE_API_URL=http://localhost:8787 npm run dev
 ```
 
-| Area       | What the server does                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| Sign-in    | Phone + OTP (hashed, 5-min expiry, resend cooldown, 6/hour limit, 5 wrong tries), 60-day sessions |
-| Ads        | Create / edit / publish drafts / delete, search & filters, view counts, boosts, price history     |
-| Photos     | `POST /api/uploads` — the app uploads compressed photos, the server stores and serves them        |
-| Favourites | Per-account, with live save counts; price drops notify everyone watching                          |
-| Chat       | Buyer ↔ seller threads, offers, read receipts; the app polls `/api/updates` every 5 s             |
-| Trust      | Reviews (one per buyer, updates the seller's rating), reports, two-way blocking                   |
-| Demo data  | A fresh database is seeded with the same 16 listings and 5 sellers; demo sellers auto-reply       |
+| Area       | What the server does                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Sign-in    | Phone + OTP (hashed, 5-min expiry, resend cooldown, 6/hour limit, 5 wrong tries), 60-day sessions                          |
+| Ads        | Create / edit / publish drafts / delete, search & filters, view counts, price history                                      |
+| Boosts     | ₹149 / 7 days via **Razorpay** (UPI, cards, netbanking) — signature-verified + webhook; renewals extend; free when no keys |
+| Photos     | `POST /api/uploads` — the app uploads compressed photos, the server stores and serves them                                 |
+| Favourites | Per-account, with live save counts; price drops notify everyone watching                                                   |
+| Chat       | Buyer ↔ seller threads, offers, read receipts; **live** via server-sent events (`/api/stream`), polling as fallback        |
+| Trust      | Reviews (one per buyer, updates the seller's rating), reports, two-way blocking                                            |
+| Moderation | Admin screen (`/admin`): report queue, restore / remove ads, ban / unban; 3 reports auto-hide an ad for review             |
+| Demo data  | A fresh database is seeded with the same 16 listings and 5 sellers; demo sellers auto-reply                                |
 
 **Sending real OTP SMS** — set either `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM`,
 or `SMS_WEBHOOK_URL` (+ `SMS_WEBHOOK_TOKEN`) to forward `{phone, code, message}` to any Indian
 SMS gateway (MSG91, Fast2SMS…). With neither, production refuses OTP requests; for a public demo
 set `OTP_DEV_CODE=1234`. All settings are listed at the top of `server/index.js`.
+
+**Taking payments for boosts** — create a [Razorpay](https://dashboard.razorpay.com) account, then set
+`RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` (start with _test-mode_ keys — test UPI/cards, no real money).
+Add a webhook in the Razorpay dashboard pointing to `https://<your-api>/api/payments/webhook` with
+events `payment.captured` and `order.paid`, and put its secret in `RAZORPAY_WEBHOOK_SECRET`; it
+completes boosts even if a buyer closes the app mid-payment. Without keys, boosts stay free.
+
+**Moderators** — set `ADMIN_PHONES` to a comma-separated list of mobile numbers. Those accounts
+get a **Moderation** entry under Account → Activity on their next sign-in.
 
 **Deploying the API**
 
@@ -278,7 +290,7 @@ npm run typecheck   # tsc --noEmit
 npm run smoke       # render every route in jsdom (guest + signed-in), assert no errors
 npm run flows       # drive real UI flows: sign-in → post → boost → chat → filters → dark mode
 npm run server      # API on :8787 (server:dev restarts on changes)
-npm run server:test # 13 API tests (auth, ads, chat, reviews, blocks, uploads)
+npm run server:test # 28 API tests (auth, ads, chat, live stream, payments, moderation…)
 npm run test:sync   # runs the app's real store + sync layer against a live API
 npm run keystore    # create the Play Store signing key
 npm run verify      # typecheck + smoke + flows + API + sync + build  ← the full gate
@@ -294,15 +306,15 @@ props, bad routes and runtime errors without a browser binary.
 
 ## 10. What's next
 
-Done: backend with real accounts, OTP, photos, chat, reviews and blocking; signed releases;
-hosting. Natural next steps as the marketplace grows:
+Done: backend with real accounts, OTP, photos, live chat, reviews, blocking, paid boosts and
+moderation; distances from your chosen area; signed releases; hosting. Next as it grows:
 
-1. **Payments** — Razorpay for boosts (the hook is marked in `POST /api/ads/:id/boost`).
-2. **Push notifications** — FCM via `@capacitor/push-notifications`, so replies arrive with the app closed.
-3. **Scale** — move SQLite to Postgres and photos to S3/Cloudinary once one server isn't enough.
-4. **Moderation** — an admin view over the `reports` table; image/text classifiers.
-5. **Maps & geo** — real coordinates and radius search instead of neighbourhood centroids.
-6. **Server-side AI** — swap `src/lib/ai.ts` heuristics for an LLM endpoint.
+1. **Push notifications** — FCM via `@capacitor/push-notifications` (needs a Firebase project and
+   its `google-services.json`), so replies arrive with the app closed.
+2. **Scale** — SQLite → Postgres and photos → S3/Cloudinary once one server isn't enough.
+3. **Automatic moderation** — image/text classifiers feeding the existing report queue.
+4. **Precise location** — GPS / pin-drop per ad instead of neighbourhood centroids.
+5. **Server-side AI** — swap `src/lib/ai.ts` heuristics for an LLM endpoint.
 
 ---
 

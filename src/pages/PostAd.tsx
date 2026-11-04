@@ -190,14 +190,21 @@ export default function PostAd() {
     navigate(`/ad/${id}`);
   };
 
-  if (editId && !editing) {
+  const locked = editing?.status === 'pending' || editing?.status === 'removed';
+  if ((editId && !editing) || locked) {
     return (
       <div className="mx-auto max-w-lg">
         <TopBar back="/myads" title="Edit ad" />
         <EmptyState
           icon={<X size={26} />}
-          title="Ad not found"
-          body="It may have been deleted, or it belongs to another seller."
+          title={locked ? "This ad can't be edited right now" : 'Ad not found'}
+          body={
+            editing?.status === 'pending'
+              ? 'It is hidden while our team reviews reports about it. You can edit it once the review is done.'
+              : editing?.status === 'removed'
+                ? "It was removed for breaking Bazaar's posting rules."
+                : 'It may have been deleted, or it belongs to another seller.'
+          }
           action="Back to My ads"
           onAction={() => navigate('/myads')}
         />

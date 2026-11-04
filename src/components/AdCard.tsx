@@ -2,7 +2,7 @@ import { Heart, MapPin, BadgeCheck, Sparkles, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { categoryById } from '../lib/data';
-import { useSeller } from '../lib/hooks';
+import { useAdDistance, useSeller } from '../lib/hooks';
 import { useStore } from '../lib/store';
 import type { Ad } from '../lib/types';
 import { cn, inr, priceLabel, timeAgo, vibrate } from '../lib/utils';
@@ -103,6 +103,7 @@ export function priceDrop(ad: Ad): { from: number; pct: number } | null {
 
 export function AdCard({ ad, compact = false }: { ad: Ad; compact?: boolean }) {
   const seller = useSeller(ad.sellerId);
+  const distance = useAdDistance();
   const drop = priceDrop(ad);
   return (
     <Link
@@ -169,7 +170,7 @@ export function AdCard({ ad, compact = false }: { ad: Ad; compact?: boolean }) {
           <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted">
             <MapPin size={11} className="shrink-0" />
             <span className="truncate">
-              {ad.area} · {ad.distanceKm} km
+              {ad.area} · {distance(ad)} km
             </span>
           </span>
           <span className="shrink-0 text-[11px] text-muted">{timeAgo(ad.createdAt)}</span>

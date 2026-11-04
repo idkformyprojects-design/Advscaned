@@ -12,9 +12,9 @@ Capacitor Android shell.
 - **Stack:** React 18 · TypeScript (strict) · Vite 5 · Tailwind 3.4 · Zustand (+persist) ·
   React Router 6 · Framer Motion · lucide-react · Capacitor 8 · **API:** Node 22 `node:http` +
   `node:sqlite` (zero npm dependencies)
-- **Two modes, same UI.** Built *without* `VITE_API_URL` the Zustand store is the whole data layer
+- **Two modes, same UI.** Built _without_ `VITE_API_URL` the Zustand store is the whole data layer
   (persisted to `localStorage`, key `bazaar-store-v1`) and every flow works offline as a demo.
-  Built *with* `VITE_API_URL` the store stays the UI cache but every action is synced to the API in
+  Built _with_ `VITE_API_URL` the store stays the UI cache but every action is synced to the API in
   `server/` (real accounts, OTP, photos, chat).
 - **Status:** feature-complete. 20 routes render, the interaction flows pass, 13 API tests and an
   app↔API sync test pass, CI builds a debug APK on every push and a signed AAB/APK on `v*` tags.
@@ -75,13 +75,13 @@ src/
 │   └── utils.ts         INR formatting, timeAgo, image compression, share, cn()
 └── pages/               Home, SearchPage, AdDetail, PostAd (also /post/:id to edit), Chats,
                          ChatThread, Favorites, SavedSearches, MyAds, Insights, Profile, Login,
-                         Notifications, SellerProfile, NotFound
+                         Notifications, SellerProfile, Admin (/admin, moderators), NotFound
 server/
 ├── index.js             env config (see header comment), SMS sending, startup
 ├── app.js               all routes, auth, validation, notifications
-├── db.js                SQLite schema + demo seeding from seed.json
+├── db.js                SQLite schema, idempotent migrations, demo seeding from seed.json
 ├── seed.json            regenerate with `npm run server:seed-json` after editing src/lib/seed.ts
-└── test/api.test.js     node:test suite
+└── test/                api.test.js (core) + next.test.js (live stream, payments, moderation)
 ```
 
 ---
@@ -95,22 +95,25 @@ Key state: `user`, `ads`, `chats`, `favorites`, `recentlyViewed`, `notifications
 
 Important actions:
 
-| Action                                                              | Notes                                                                                                              |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Action                                                              | Notes                                                                                                               |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `login(name, phone, area)`                                          | offline mode only; API mode signs in via `api.verifyOtp` + `completeSignIn()` in sync.ts                            |
-| `createAd(ad)` / `updateAd` / `deleteAd`                            | ads created by the user use `sellerId: 'me'`                                                                       |
-| `boostAd(id)`                                                       | sets `featured` + `boosted`, pushes a notification                                                                 |
-| `dropPrice(id, price)`                                              | appends to `ad.priceHistory`, pushes a notification                                                                |
-| `startChat(adId)` → id                                              | reuses the existing chat for that ad if present                                                                    |
+| `createAd(ad)` / `updateAd` / `deleteAd`                            | ads created by the user use `sellerId: 'me'`                                                                        |
+| `boostAd(id)`                                                       | sets `featured` + `boosted`, pushes a notification                                                                  |
+| `dropPrice(id, price)`                                              | appends to `ad.priceHistory`, pushes a notification                                                                 |
+| `startChat(adId)` → id                                              | reuses the existing chat for that ad if present                                                                     |
 | `sendMessage(chatId, text, kind)`                                   | appends message; offline → simulated seller reply after ~1.4s; API mode → sent to server, replies arrive by polling |
 | `blockSeller` / `unblockSeller` / `report`                          | block hides the seller's chats + ads; unblock from Profile                                                          |
-| `addReview(r)` / `addSavedSearch` / `toggleFavorite` / `markViewed` | …                                                                                                                  |
-| `resetDemo()`                                                       | restores seed data (Profile → Reset demo data)                                                                     |
+| `addReview(r)` / `addSavedSearch` / `toggleFavorite` / `markViewed` | …                                                                                                                   |
+| `resetDemo()`                                                       | restores seed data (Profile → Reset demo data)                                                                      |
 
 **API mode:** every mutating action calls `remote.*` in `src/lib/sync.ts` right after its optimistic
 `set()`. The server's id for the signed-in user is mapped to `'me'` (so `sellerId: 'me'` keeps working)
-and a chat's `sellerId` is always the *other* person. New actions that change shared data need a
-matching `remote.*` call and server route.
+and a chat's `sellerId` is always the _other_ person. New actions that change shared data need a
+matching `remote.*` call and server route. `connectStream()` keeps an EventSource on `/api/stream`;
+each `update` event triggers an immediate `/api/updates` fetch (polling drops to every 30 s while
+the stream is live). Paid boosts go through `payForBoost()` (Razorpay Checkout → `/api/payments/verify`).
+Ad statuses `pending` (hidden for review) and `removed` (by moderators) are server-controlled.
 
 **Resetting during development:** DevTools → Application → Local Storage → delete
 `bazaar-store-v1`, or use the in-app reset. Bump the `version` in `persist` if you change the shape.
@@ -159,27 +162,26 @@ the DOM globals list at the top of each script; add new ones there if a library 
 
 ## 8. What is real vs. simulated
 
-| Real (with the API)                                     | Still simulated / local                           |
-| ------------------------------------------------------- | ------------------------------------------------- |
-| Phone OTP sign-in (Twilio or SMS webhook), sessions     | Payments for boosts (no charge yet)               |
-| Ads, drafts, edits, price history, boosts               | Analytics (`insights.ts` derives from seed math)  |
-| Photo upload + hosting                                  | Push notifications (browser-only, no FCM)         |
-| Favourites, price-drop alerts, notifications            | Chat is polled every 5 s, not WebSocket           |
-| Chat with offers + read receipts                        | Saved searches + recently viewed stay on-device   |
-| Reviews, reports, blocking                              | Map uses neighbourhood centroids                  |
+| Real (with the API)                                 | Still simulated / local                          |
+| --------------------------------------------------- | ------------------------------------------------ |
+| Phone OTP sign-in (Twilio or SMS webhook), sessions | Analytics (`insights.ts` derives from seed math) |
+| Ads, drafts, edits, price history                   | Push notifications (browser-only, no FCM)        |
+| Paid 7-day boosts via Razorpay (+ webhook), expiry  | Saved searches + recently viewed stay on-device  |
+| Photo upload + hosting                              | Ad locations are neighbourhood centroids         |
+| Live chat (SSE) with offers + read receipts         |                                                  |
+| Reviews, reports, blocking, moderation + bans       |                                                  |
 
 Offline mode (no `VITE_API_URL`) simulates everything in the left column too.
 
 ## 9. Suggested next steps (in order of value)
 
 1. **Deploy**: API on Render (`render.yaml`) or Docker; web on Vercel/Netlify/Cloudflare; set
-   `VITE_API_URL` (host settings + GitHub Actions variable).
-2. **Payments**: Razorpay for boosts — hook point marked in `POST /api/ads/:id/boost`.
-3. **Push**: FCM via `@capacitor/push-notifications` so replies arrive with the app closed.
-4. **Scale**: SQLite → Postgres and photos → S3/Cloudinary once one server isn't enough.
-5. **Moderation**: admin view over the `reports` table; image/text classifiers.
-6. **Maps**: real coordinates + radius search instead of `geo.ts` centroids.
-7. **Play Store listing**: privacy policy, screenshots, data-safety form.
+   `VITE_API_URL` (host settings + GitHub Actions variable), `ADMIN_PHONES`, Razorpay keys.
+2. **Push**: FCM via `@capacitor/push-notifications` so replies arrive with the app closed.
+3. **Scale**: SQLite → Postgres and photos → S3/Cloudinary once one server isn't enough.
+4. **Auto-moderation**: image/text classifiers feeding the existing report queue.
+5. **Precise location**: GPS / pin-drop per ad instead of `geo.ts` centroids.
+6. **Play Store listing**: privacy policy, screenshots, data-safety form.
 
 ## 10. Gotchas
 
@@ -190,7 +192,7 @@ Offline mode (no `VITE_API_URL`) simulates everything in the left column too.
 - Ads created by the user have `sellerId: 'me'`; resolve sellers through `useSeller()`.
   `sellerById()` is fine only for ids that can never be `'me'` (chat counterparts, block list);
   in API mode it also knows real accounts via `registerSellers()`.
-- `src/lib` must stay *erasable* TypeScript (no enums, no constructor parameter properties) —
+- `src/lib` must stay _erasable_ TypeScript (no enums, no constructor parameter properties) —
   `test:sync` runs it directly with Node's type stripping.
 - Sheets lock `#app-scroll`, the app's real scroll container (body does not scroll).
 - Prettier config is committed — run `npx prettier --write "src/**/*.{ts,tsx,css}"` before pushing.

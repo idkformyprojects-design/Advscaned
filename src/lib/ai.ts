@@ -1,5 +1,6 @@
 import { CATEGORIES, categoryById } from './data';
 import type { Ad, CategoryId } from './types';
+import { adDistance } from './geo';
 
 /**
  * On-device "assist" engine.
@@ -144,7 +145,7 @@ export function rankAds<T extends Ad>(ads: T[], query: string, userArea: string)
       if (ad.featured) score += 3;
       if (ad.area === userArea) score += 2;
       score += Math.min(4, ad.saves / 40);
-      score -= ad.distanceKm / 25;
+      score -= adDistance(ad, userArea) / 25;
       return { ad, score };
     })
     .filter((x) => x.score > 0)

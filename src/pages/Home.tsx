@@ -21,6 +21,7 @@ import { Sheet, SectionHeader } from '../components/ui';
 import { AREAS, CATEGORIES } from '../lib/data';
 import { TRENDING_SEARCHES } from '../lib/seed';
 import { useStore } from '../lib/store';
+import { adDistance } from '../lib/geo';
 import { cn, inr, timeAgo, vibrate } from '../lib/utils';
 import { Logo } from '../components/AppShell';
 
@@ -96,9 +97,9 @@ export default function Home() {
       case 'verified':
         return list.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
       default:
-        return list.sort((a, b) => a.distanceKm - b.distanceKm);
+        return list.sort((a, b) => adDistance(a, area) - adDistance(b, area));
     }
-  }, [active, tab]);
+  }, [active, tab, area]);
 
   const featured = active.filter((a) => a.featured).slice(0, 6);
   const recentAds = recentlyViewed

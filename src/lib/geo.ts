@@ -62,6 +62,15 @@ export function pinLabel(price: number, category: string): string {
   return '₹' + price;
 }
 
+/**
+ * Distance from the buyer's chosen area to an ad, in km (one decimal).
+ * Uses the same jittered coordinates as the map so the numbers always agree with it.
+ */
+export function adDistance(ad: Ad, fromArea: string): number {
+  const from = AREA_COORDS[fromArea] ?? DEFAULT_CENTER;
+  return Math.max(0.2, distanceKm(from, adCoords(ad)));
+}
+
 /** Distance in km between two coordinates (haversine). */
 export function distanceKm(
   a: { lat: number; lng: number },

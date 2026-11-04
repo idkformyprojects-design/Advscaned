@@ -10,6 +10,7 @@ import {
   PenLine,
   Plus,
   Rocket,
+  ShieldAlert,
   Sparkles,
   Trash2,
   Zap,
@@ -18,8 +19,25 @@ import { TopBar } from '../components/TopBar';
 import { AdThumb } from '../components/AdCard';
 import { Badge, EmptyState, Sheet } from '../components/ui';
 import { toast, useStore } from '../lib/store';
+import { payForBoost } from '../lib/sync';
 import { cn, inr, timeAgo } from '../lib/utils';
 import type { AdStatus } from '../lib/types';
+
+const STATUS_BADGE: Record<
+  AdStatus,
+  { label: string; tone: 'brand' | 'red' | 'neutral' | 'amber' }
+> = {
+  active: { label: 'Live', tone: 'brand' },
+  sold: { label: 'Sold', tone: 'red' },
+  draft: { label: 'Draft', tone: 'neutral' },
+  pending: { label: 'Under review', tone: 'amber' },
+  removed: { label: 'Removed', tone: 'red' },
+};
+
+const daysLeft = (until: number) => {
+  const d = Math.ceil((until - Date.now()) / 86_400_000);
+  return d <= 1 ? 'ends today' : `${d} days left`;
+};
 
 const TABS: { id: AdStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -36,6 +54,11 @@ export default function MyAds() {
   const boostAd = useStore((s) => s.boostAd);
   const dropPrice = useStore((s) => s.dropPrice);
   const navigate = useNavigate();
+  const serverConfig = useStore((s) => s.serverConfig);
+  const paid = !!serverConfig?.payments;
+  const boostPrice = serverConfig ? serverConfig.boostPricePaise / 100 : 149;
+  const boostDays = serverConfig?.boostDays ?? 7;
+  const [paying, setPaying] = useState(false);
   const [tab, setTab] = useState<AdStatus | 'all'>('all');
   const [boostTarget, setBoostTarget] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -144,16 +167,8 @@ export default function MyAds() {
                         <p className="text-[15px] font-extrabold">{inr(ad.price)}</p>
                         <p className="truncate text-[12.5px] font-medium">{ad.title}</p>
                       </div>
-                      <Badge
-                        tone={
-                          ad.status === 'active'
-                            ? 'brand'
-                            : ad.status === 'sold'
-                              ? 'red'
-                              : 'neutral'
-                        }
-                      >
-                        {ad.status === 'active' ? 'Live' : ad.status === 'sold' ? 'Sold' : 'Draft'}
+                      <Badge tone={STATUS_BADGE[ad.status].tone}>
+                        {STATUS_BADGE[ad.status].label}
                       </Badge>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-muted">
@@ -167,13 +182,39 @@ export default function MyAds() {
                       {ad.boosted && (
                         <span className="flex items-center gap-1 font-semibold text-accent-600">
                           <Zap size={10} /> Boosted
+                          {ad.boostedUntil ? ` · ${daysLeft(ad.boostedUntil)}` : ''}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {ad.status === 'draft' ? (
+                {ad.status === 'pending' || ad.status === 'removed' ? (
+                  <div className="mt-2.5 flex items-center gap-2 border-t pt-2.5 hairline">
+                    <ShieldAlert
+                      size={15}
+                      className={
+                        ad.status === 'pending'
+                          ? 'shrink-0 text-accent-600'
+                          : 'shrink-0 text-rose-500'
+                      }
+                    />
+                    <p className="flex-1 text-[11.5px] leading-snug text-muted">
+                      {ad.status === 'pending'
+                        ? 'Hidden while our team reviews reports about it — usually within 24 hours.'
+                        : "Taken down for breaking Bazaar's posting rules. It can't be edited or relisted."}
+                    </p>
+                    {ad.status === 'removed' && (
+                      <button
+                        onClick={() => setConfirmDelete(ad.id)}
+                        aria-label="Delete ad"
+                        className="grid h-8 w-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                ) : ad.status === 'draft' ? (
                   <div className="mt-2.5 flex gap-1.5 border-t pt-2.5 hairline">
                     <Link
                       to={`/post/${ad.id}`}
@@ -283,8 +324,11 @@ export default function MyAds() {
               <Sparkles size={14} className="text-accent-500" /> Sell 3× faster with a boost
             </p>
             <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
-              Boosted ads appear at the top of nearby searches and in the “Featured today” rail for
-              7 days. Demo only — no real payment is taken.
+              Boosted ads appear at the top of nearby searches and in the “Featured today” rail for{' '}
+              {boostDays} days.{' '}
+              {paid
+                ? `${inr(boostPrice)} via UPI, card or netbanking.`
+                : 'Demo only — no real payment is taken.'}
             </p>
           </div>
         )}
@@ -293,9 +337,9 @@ export default function MyAds() {
       <Sheet open={!!boostTarget} onClose={() => setBoostTarget(null)} title="Boost this ad">
         <div className="rounded-2xl bg-gradient-to-br from-accent-500 to-orange-600 p-4 text-white">
           <p className="text-[11px] font-bold uppercase tracking-widest text-white/80">
-            7-day boost
+            {boostDays}-day boost
           </p>
-          <p className="mt-1 text-[26px] font-extrabold">₹149</p>
+          <p className="mt-1 text-[26px] font-extrabold">{inr(boostPrice)}</p>
           <p className="text-[12px] text-white/80">Featured placement + 3× more views</p>
         </div>
         <ul className="mt-3 space-y-2 text-[12.5px] text-muted">
@@ -304,19 +348,44 @@ export default function MyAds() {
           <li>• Weekly performance report in notifications</li>
         </ul>
         <button
-          onClick={() => {
-            if (boostTarget) {
+          disabled={paying}
+          onClick={async () => {
+            if (!boostTarget) return;
+            if (!paid) {
               boostAd(boostTarget);
-              toast('Boost activated for 7 days 🚀', 'success', { label: 'View', to: '/myads' });
+              toast(`Boost activated for ${boostDays} days 🚀`, 'success', {
+                label: 'View',
+                to: '/myads',
+              });
+              setBoostTarget(null);
+              return;
             }
-            setBoostTarget(null);
+            setPaying(true);
+            try {
+              const result = await payForBoost(boostTarget);
+              if (result === 'paid') {
+                toast(`Payment received — boosted for ${boostDays} days 🚀`, 'success');
+                setBoostTarget(null);
+              }
+            } catch (e) {
+              toast(e instanceof Error ? e.message : 'Payment failed', 'error');
+            } finally {
+              setPaying(false);
+            }
           }}
           className="btn btn-primary mt-4 w-full"
         >
-          <Zap size={16} /> Activate boost
+          <Zap size={16} />{' '}
+          {paying
+            ? 'Opening secure checkout…'
+            : paid
+              ? `Pay ${inr(boostPrice)} & boost`
+              : 'Activate boost'}
         </button>
         <p className="mt-2 text-center text-[11px] text-muted">
-          Demo checkout · no card required, nothing is charged.
+          {paid
+            ? 'Secure payment by Razorpay · UPI, cards, netbanking, wallets.'
+            : 'Demo checkout · no card required, nothing is charged.'}
         </p>
       </Sheet>
 

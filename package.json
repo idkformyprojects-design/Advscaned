@@ -24,7 +24,7 @@
     "server:dev": "node --no-warnings --watch server/index.js",
     "server:test": "node --no-warnings --test server/test/*.test.js",
     "server:seed-json": "node --no-warnings scripts/export-seed.mjs",
-    "test:sync": "node --no-warnings scripts/sync-e2e.mjs",
+    "test:sync": "node --no-warnings --experimental-eventsource scripts/sync-e2e.mjs",
     "keystore": "bash scripts/make-keystore.sh"
   },
   "dependencies": {
