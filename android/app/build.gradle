@@ -1,5 +1,25 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Release signing. Credentials come from (first match wins):
+ *   1. android/keystore.properties  (local builds — never commit it)
+ *   2. BAZAAR_* environment variables (CI — filled from GitHub secrets)
+ * Without either, release builds are produced unsigned and debug builds are unaffected.
+ */
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+def signingValue = { String prop, String env -> keystoreProps.getProperty(prop) ?: System.getenv(env) }
+def releaseStoreFile = signingValue('storeFile', 'BAZAAR_KEYSTORE_FILE')
+def hasReleaseSigning = releaseStoreFile && rootProject.file(releaseStoreFile).exists() &&
+        signingValue('storePassword', 'BAZAAR_KEYSTORE_PASSWORD')
+
+// CI passes the run number so every upload to Play gets a higher versionCode.
+def ciVersionCode = (System.getenv('BAZAAR_VERSION_CODE') ?: '1') as Integer
+def ciVersionName = System.getenv('BAZAAR_VERSION_NAME') ?: '1.0.0'
+
 android {
     namespace = "com.bazaar.marketplace"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +27,8 @@ android {
         applicationId "com.bazaar.marketplace"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode ciVersionCode
+        versionName ciVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +36,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword signingValue('storePassword', 'BAZAAR_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'BAZAAR_KEY_ALIAS') ?: 'bazaar'
+                keyPassword signingValue('keyPassword', 'BAZAAR_KEY_PASSWORD') ?:
+                        signingValue('storePassword', 'BAZAAR_KEYSTORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

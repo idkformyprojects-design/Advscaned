@@ -33,14 +33,31 @@ cd android && ./gradlew assembleDebug
 # → android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-For a **release** APK/AAB you need a signing key and a `release` build type:
+**d. Signed release for the Play Store**
+
+Signing is already wired into `android/app/build.gradle`; you only create the key once:
 
 ```bash
-keytool -genkey -v -keystore bazaar.keystore -alias bazaar \
-  -keyalg RSA -keysize 2048 -validity 10000
-# then configure signingConfigs in android/app/build.gradle and run
-./gradlew bundleRelease     # Play Store AAB
+bash scripts/make-keystore.sh      # → android/bazaar-release.jks + android/keystore.properties (git-ignored)
+cd android && ./gradlew bundleRelease assembleRelease
+# → app/build/outputs/bundle/release/app-release.aab   (upload to Play Console)
+# → app/build/outputs/apk/release/app-release.apk      (signed, installable)
 ```
+
+To let CI build signed releases, add the three secrets the script prints
+(`BAZAAR_KEYSTORE_BASE64`, `BAZAAR_KEYSTORE_PASSWORD`, `BAZAAR_KEY_ALIAS`) under
+**Settings → Secrets and variables → Actions**, then publish a version by pushing a tag:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The **Release** workflow builds the signed `.aab` + `.apk`, verifies the signatures and attaches
+both to a GitHub Release. `versionCode` increases automatically on every run, as Play requires.
+
+> Back up the `.jks` file and its password somewhere safe (a password manager). When you create
+> the app in Play Console, keep **Play App Signing** on — then this key is only your *upload* key
+> and Google can reset it if it's ever lost.
 
 App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView shell are already wired up.
 
@@ -179,6 +196,7 @@ scripts/
 | --------------- | ------------------------------------------------------------------------------------------------- |
 | **Web checks**  | `npm ci` → `tsc` → 20-route smoke → interaction flows → production build → uploads `web-build` |
 | **Android APK** | JDK 21 + Android SDK 36 → `cap sync` → `./gradlew assembleDebug` → uploads `bazaar-debug-apk`     |
+| **Release** (`release.yml`, on `v*` tags) | signed `bundleRelease` + `assembleRelease` → signature check → GitHub Release |
 
 Both jobs currently pass in ~2 minutes.
 

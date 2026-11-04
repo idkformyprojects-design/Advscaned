@@ -1,0 +1,125 @@
+name: Release
+
+# Builds a signed Play Store bundle (.aab) and a signed APK.
+#   • Push a tag like v1.2.0   → builds and publishes a GitHub Release with both files.
+#   • Run manually (Actions → Release → Run workflow) → builds and uploads them as artifacts.
+# Needs repository secrets BAZAAR_KEYSTORE_BASE64, BAZAAR_KEYSTORE_PASSWORD, BAZAAR_KEY_ALIAS
+# (create them with `bash scripts/make-keystore.sh`).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android-release:
+    name: Signed AAB + APK
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.BAZAAR_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secrets
+        if: env.HAS_KEYSTORE != 'true'
+        run: |
+          echo "::error::Signing secrets are missing. Run 'bash scripts/make-keystore.sh' locally and add BAZAAR_KEYSTORE_BASE64, BAZAAR_KEYSTORE_PASSWORD and BAZAAR_KEY_ALIAS under Settings → Secrets and variables → Actions."
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Prepare Android SDK
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          SDKM="$(command -v sdkmanager || true)"
+          if [ -z "$SDKM" ]; then SDKM="$SDK/cmdline-tools/latest/bin/sdkmanager"; fi
+          yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+          "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          echo "$SDK/build-tools/36.0.0" >> "$GITHUB_PATH"
+
+      - name: Version from tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then NAME="${GITHUB_REF_NAME#v}"; else NAME="0.0.${GITHUB_RUN_NUMBER}"; fi
+          echo "BAZAAR_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
+          # Play requires a strictly increasing versionCode; the run number always grows.
+          echo "BAZAAR_VERSION_CODE=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
+          echo "Building version $NAME (code $((GITHUB_RUN_NUMBER + 100)))"
+
+      - name: Restore keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.BAZAAR_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/bazaar-release.jks"
+          echo "BAZAAR_KEYSTORE_FILE=$RUNNER_TEMP/bazaar-release.jks" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build
+
+      - name: Sync Capacitor project
+        run: npx cap sync android
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build signed bundle and APK
+        working-directory: android
+        env:
+          BAZAAR_KEYSTORE_PASSWORD: ${{ secrets.BAZAAR_KEYSTORE_PASSWORD }}
+          BAZAAR_KEY_ALIAS: ${{ secrets.BAZAAR_KEY_ALIAS }}
+          BAZAAR_KEY_PASSWORD: ${{ secrets.BAZAAR_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+
+      - name: Verify signatures
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -f "$APK" || { echo "::error::Release APK is unsigned or missing — check the signing secrets."; ls -R android/app/build/outputs; exit 1; }
+          apksigner verify --print-certs "$APK" | head -5
+          jarsigner -verify "$AAB" | tail -1
+          mkdir -p release
+          cp "$APK" "release/bazaar-${BAZAAR_VERSION_NAME}.apk"
+          cp "$AAB" "release/bazaar-${BAZAAR_VERSION_NAME}.aab"
+          rm -f "$RUNNER_TEMP/bazaar-release.jks"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazaar-release-${{ env.BAZAAR_VERSION_NAME }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          body: |
+            **Bazaar ${{ env.BAZAAR_VERSION_NAME }}**
+            - `bazaar-${{ env.BAZAAR_VERSION_NAME }}.aab` — upload this to Google Play Console.
+            - `bazaar-${{ env.BAZAAR_VERSION_NAME }}.apk` — signed APK for direct install.
+
+      - name: Job summary
+        run: |
+          echo "### 🚀 Signed release ${BAZAAR_VERSION_NAME} (code ${BAZAAR_VERSION_CODE})" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh release >> "$GITHUB_STEP_SUMMARY"
