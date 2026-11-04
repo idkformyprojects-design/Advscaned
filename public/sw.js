@@ -1,5 +1,7 @@
 /* Bazaar service worker — app-shell precache + offline navigation fallback */
-const VERSION = 'bazaar-v1';
+// __BUILD_ID__ is replaced with a unique id on every production build (see vite.config.ts),
+// so each deploy gets fresh caches and old ones are deleted on activate.
+const VERSION = 'bazaar-__BUILD_ID__';
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
@@ -39,6 +41,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Live data must always come from the network.
+  if (url.pathname.startsWith('/api/')) return;
 
   // SPA navigations: network first, fall back to cached shell when offline.
   if (request.mode === 'navigate') {

@@ -188,7 +188,25 @@ scripts/
 
 ---
 
-## 6. CI
+## 6. Hosting the web app
+
+The PWA is a static site, ready for any of these free hosts — config is already in the repo:
+
+| Host | How | Config used |
+| --- | --- | --- |
+| **Vercel** | Import the GitHub repo → Deploy (settings are auto-detected) | `vercel.json` |
+| **Netlify** | Add new site → Import from Git → Deploy | `netlify.toml`, `public/_redirects`, `public/_headers` |
+| **Cloudflare Pages** | Connect repo → build `npm run build`, output `dist` | `public/_redirects`, `public/_headers` |
+
+All three get: deep links (`/ad/ad-3`, `/chats/…`) served by `index.html`, a never-cached
+`sw.js` so updates reach users on their next visit, year-long caching for hashed `/assets/*`,
+and basic security headers. Every production build stamps a new id into the service worker,
+so old offline caches are cleared automatically.
+
+To connect a hosted app to the backend (section 8), set the environment variable
+`VITE_API_URL` (e.g. `https://bazaar-api.onrender.com`) in the host's project settings and redeploy.
+
+## 7. CI
 
 `.github/workflows/ci.yml` runs two jobs on every push and pull request:
 
@@ -200,7 +218,7 @@ scripts/
 
 Both jobs currently pass in ~2 minutes.
 
-## 7. Scripts
+## 8. Scripts
 
 ```bash
 npm run dev         # Vite dev server on 0.0.0.0:5173
@@ -221,7 +239,7 @@ props, bad routes and runtime errors without a browser binary.
 
 ---
 
-## 8. Making it production-ready
+## 9. Making it production-ready
 
 The demo is intentionally backend-free. To ship for real:
 
