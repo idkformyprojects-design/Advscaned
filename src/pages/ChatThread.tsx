@@ -225,60 +225,60 @@ export default function ChatThread() {
           </button>
         </div>
       ) : (
-      <div
-        className="border-t px-3 pb-2 pt-2 backdrop-blur-xl"
-        style={{
-          borderColor: 'var(--line)',
-          background: 'color-mix(in srgb, var(--surface) 92%, transparent)',
-          paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
-        }}
-      >
-        <div className="no-scrollbar mb-2 flex gap-1.5 overflow-x-auto">
-          {quickReplies(ad?.title ?? 'this item').map((r) => (
-            <button key={r} onClick={() => send(r)} className="chip px-3 py-1.5 text-[11.5px]">
-              {r}
-            </button>
-          ))}
-          <button
-            onClick={() => setOfferOpen(true)}
-            className="chip px-3 py-1.5 text-[11.5px] font-semibold text-brand-700 dark:text-brand-300"
-          >
-            <Zap size={11} /> Make offer
-          </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            send();
+        <div
+          className="border-t px-3 pb-2 pt-2 backdrop-blur-xl"
+          style={{
+            borderColor: 'var(--line)',
+            background: 'color-mix(in srgb, var(--surface) 92%, transparent)',
+            paddingBottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
           }}
-          className="flex items-end gap-2"
         >
-          <button
-            type="button"
-            onClick={() => setMenu(true)}
-            aria-label="More"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-200"
-          >
-            <ImagePlus size={18} />
-          </button>
-          <div className="flex-1">
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Message…"
-              className="input rounded-full py-2.5 text-[14px]"
-            />
+          <div className="no-scrollbar mb-2 flex gap-1.5 overflow-x-auto">
+            {quickReplies(ad?.title ?? 'this item').map((r) => (
+              <button key={r} onClick={() => send(r)} className="chip px-3 py-1.5 text-[11.5px]">
+                {r}
+              </button>
+            ))}
+            <button
+              onClick={() => setOfferOpen(true)}
+              className="chip px-3 py-1.5 text-[11.5px] font-semibold text-brand-700 dark:text-brand-300"
+            >
+              <Zap size={11} /> Make offer
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            aria-label="Send"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-600 text-white transition active:scale-90 disabled:opacity-40"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+            className="flex items-end gap-2"
           >
-            <Send size={17} />
-          </button>
-        </form>
-      </div>
+            <button
+              type="button"
+              onClick={() => setMenu(true)}
+              aria-label="More"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-200"
+            >
+              <ImagePlus size={18} />
+            </button>
+            <div className="flex-1">
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Message…"
+                className="input rounded-full py-2.5 text-[14px]"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              aria-label="Send"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-600 text-white transition active:scale-90 disabled:opacity-40"
+            >
+              <Send size={17} />
+            </button>
+          </form>
+        </div>
       )}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Chat options">

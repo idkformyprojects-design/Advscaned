@@ -56,7 +56,7 @@ The **Release** workflow builds the signed `.aab` + `.apk`, verifies the signatu
 both to a GitHub Release. `versionCode` increases automatically on every run, as Play requires.
 
 > Back up the `.jks` file and its password somewhere safe (a password manager). When you create
-> the app in Play Console, keep **Play App Signing** on — then this key is only your *upload* key
+> the app in Play Console, keep **Play App Signing** on — then this key is only your _upload_ key
 > and Google can reset it if it's ever lost.
 
 App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView shell are already wired up.
@@ -129,7 +129,7 @@ App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView 
 | Motion  | **Framer Motion**                                        | Sheet transitions, micro-interactions                     |
 | Icons   | **Lucide**                                               | Consistent 2px iconography                                |
 | Native  | **Capacitor 8**                                          | Wraps the same build into an Android APK                  |
-| Backend | **Node 22** `node:http` + `node:sqlite`                  | Real API with zero dependencies, one-file deploy         |
+| Backend | **Node 22** `node:http` + `node:sqlite`                  | Real API with zero dependencies, one-file deploy          |
 | Quality | `tsc`, jsdom smoke + flows, `node:test` API suite        | Every layer checked in CI                                 |
 
 No backend is required to run the demo — the store acts as an offline repository so every flow is fully functional. Build with `VITE_API_URL` and the same store syncs with the real API in `server/` (section 7).
@@ -204,11 +204,11 @@ scripts/
 
 The PWA is a static site, ready for any of these free hosts — config is already in the repo:
 
-| Host | How | Config used |
-| --- | --- | --- |
-| **Vercel** | Import the GitHub repo → Deploy (settings are auto-detected) | `vercel.json` |
-| **Netlify** | Add new site → Import from Git → Deploy | `netlify.toml`, `public/_redirects`, `public/_headers` |
-| **Cloudflare Pages** | Connect repo → build `npm run build`, output `dist` | `public/_redirects`, `public/_headers` |
+| Host                 | How                                                          | Config used                                            |
+| -------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
+| **Vercel**           | Import the GitHub repo → Deploy (settings are auto-detected) | `vercel.json`                                          |
+| **Netlify**          | Add new site → Import from Git → Deploy                      | `netlify.toml`, `public/_redirects`, `public/_headers` |
+| **Cloudflare Pages** | Connect repo → build `npm run build`, output `dist`          | `public/_redirects`, `public/_headers`                 |
 
 All three get: deep links (`/ad/ad-3`, `/chats/…`) served by `index.html`, a never-cached
 `sw.js` so updates reach users on their next visit, year-long caching for hashed `/assets/*`,
@@ -229,15 +229,15 @@ npm run server                    # http://localhost:8787  (demo OTP: 1234)
 VITE_API_URL=http://localhost:8787 npm run dev
 ```
 
-| Area | What the server does |
-| --- | --- |
-| Sign-in | Phone + OTP (hashed, 5-min expiry, resend cooldown, 6/hour limit, 5 wrong tries), 60-day sessions |
-| Ads | Create / edit / publish drafts / delete, search & filters, view counts, boosts, price history |
-| Photos | `POST /api/uploads` — the app uploads compressed photos, the server stores and serves them |
-| Favourites | Per-account, with live save counts; price drops notify everyone watching |
-| Chat | Buyer ↔ seller threads, offers, read receipts; the app polls `/api/updates` every 5 s |
-| Trust | Reviews (one per buyer, updates the seller's rating), reports, two-way blocking |
-| Demo data | A fresh database is seeded with the same 16 listings and 5 sellers; demo sellers auto-reply |
+| Area       | What the server does                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| Sign-in    | Phone + OTP (hashed, 5-min expiry, resend cooldown, 6/hour limit, 5 wrong tries), 60-day sessions |
+| Ads        | Create / edit / publish drafts / delete, search & filters, view counts, boosts, price history     |
+| Photos     | `POST /api/uploads` — the app uploads compressed photos, the server stores and serves them        |
+| Favourites | Per-account, with live save counts; price drops notify everyone watching                          |
+| Chat       | Buyer ↔ seller threads, offers, read receipts; the app polls `/api/updates` every 5 s             |
+| Trust      | Reviews (one per buyer, updates the seller's rating), reports, two-way blocking                   |
+| Demo data  | A fresh database is seeded with the same 16 listings and 5 sellers; demo sellers auto-reply       |
 
 **Sending real OTP SMS** — set either `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM`,
 or `SMS_WEBHOOK_URL` (+ `SMS_WEBHOOK_TOKEN`) to forward `{phone, code, message}` to any Indian
@@ -259,11 +259,11 @@ signed release against it. The Android app needs an **https** URL.
 
 `.github/workflows/ci.yml` runs two jobs on every push and pull request:
 
-| Job             | What it does                                                                                      |
-| --------------- | ------------------------------------------------------------------------------------------------- |
-| **Web checks**  | `npm ci` → `tsc` → 20-route smoke → interaction flows → API tests → app↔API sync test → production build → uploads `web-build` |
-| **Android APK** | JDK 21 + Android SDK 36 → `cap sync` → `./gradlew assembleDebug` → uploads `bazaar-debug-apk`     |
-| **Release** (`release.yml`, on `v*` tags) | signed `bundleRelease` + `assembleRelease` → signature check → GitHub Release |
+| Job                                       | What it does                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Web checks**                            | `npm ci` → `tsc` → 20-route smoke → interaction flows → API tests → app↔API sync test → production build → uploads `web-build` |
+| **Android APK**                           | JDK 21 + Android SDK 36 → `cap sync` → `./gradlew assembleDebug` → uploads `bazaar-debug-apk`                                  |
+| **Release** (`release.yml`, on `v*` tags) | signed `bundleRelease` + `assembleRelease` → signature check → GitHub Release                                                  |
 
 Both jobs currently pass in ~2 minutes.
 

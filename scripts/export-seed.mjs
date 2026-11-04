@@ -22,7 +22,10 @@ const seed = {
   reviews: SEED_REVIEWS.map(({ createdAt, ...r }) => ({ ...r, ageMs: age(createdAt) })),
 };
 
-writeFileSync(new URL('../server/seed.json', import.meta.url), JSON.stringify(seed, null, 2) + '\n');
+writeFileSync(
+  new URL('../server/seed.json', import.meta.url),
+  JSON.stringify(seed, null, 2) + '\n',
+);
 console.log(
   `server/seed.json: ${seed.sellers.length} sellers, ${seed.ads.length} ads, ${seed.reviews.length} reviews`,
 );

@@ -151,14 +151,21 @@ export const api = {
     request<{ ad: Ad }>('PATCH', `/api/ads/${encodeURIComponent(id)}`, patch),
   deleteAd: (id: string) => request<{ ok: true }>('DELETE', `/api/ads/${encodeURIComponent(id)}`),
   boostAd: (id: string) => request<{ ad: Ad }>('POST', `/api/ads/${encodeURIComponent(id)}/boost`),
-  viewAd: (id: string) => request<{ views: number }>('POST', `/api/ads/${encodeURIComponent(id)}/view`),
+  viewAd: (id: string) =>
+    request<{ views: number }>('POST', `/api/ads/${encodeURIComponent(id)}/view`),
   setFavorite: (id: string, on: boolean) =>
-    request<{ saves: number }>(on ? 'PUT' : 'DELETE', `/api/ads/${encodeURIComponent(id)}/favorite`),
+    request<{ saves: number }>(
+      on ? 'PUT' : 'DELETE',
+      `/api/ads/${encodeURIComponent(id)}/favorite`,
+    ),
   upload: (dataUrl: string) => request<{ url: string }>('POST', '/api/uploads', { dataUrl }),
 
   startChat: (adId: string, id?: string) =>
     request<{ chat: RemoteChat; seller: Seller }>('POST', '/api/chats', { adId, id }),
-  sendMessage: (chatId: string, body: { id: string; text: string; kind?: string; offerAmount?: number }) =>
+  sendMessage: (
+    chatId: string,
+    body: { id: string; text: string; kind?: string; offerAmount?: number },
+  ) =>
     request<{ message: RemoteMessage }>(
       'POST',
       `/api/chats/${encodeURIComponent(chatId)}/messages`,
@@ -176,7 +183,10 @@ export const api = {
   report: (targetType: 'ad' | 'seller', targetId: string, reason: string) =>
     request<{ ok: true }>('POST', '/api/reports', { targetType, targetId, reason }),
   setBlocked: (sellerId: string, on: boolean) =>
-    request<{ blocked: string[] }>(on ? 'PUT' : 'DELETE', `/api/blocks/${encodeURIComponent(sellerId)}`),
+    request<{ blocked: string[] }>(
+      on ? 'PUT' : 'DELETE',
+      `/api/blocks/${encodeURIComponent(sellerId)}`,
+    ),
   markNotificationsRead: (id?: string) =>
     request<{ ok: true }>('POST', '/api/notifications/read', id ? { id } : {}),
 };

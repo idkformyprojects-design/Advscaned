@@ -67,7 +67,10 @@ try {
   setToken(v.token);
   const { user: me } = await api.updateMe({ name: 'Arjun Sen', area: 'Ballygunge' });
   await sync.completeSignIn(v.token, me);
-  check(S().user?.name === 'Arjun Sen' && S().user?.remoteId === me.id, 'signed in with server account');
+  check(
+    S().user?.name === 'Arjun Sen' && S().user?.remoteId === me.id,
+    'signed in with server account',
+  );
   check(S().area === 'Ballygunge', 'area synced from account');
 
   // Post an ad with a freshly taken photo (data URL) — it must be uploaded first.
@@ -92,7 +95,11 @@ try {
     status: 'active',
     attributes: { type: 'Table' },
   });
-  const uploaded = await until(() => S().ads.find((a) => a.id === 'ad-e2e-1')?.images[0]?.startsWith('http'));
+  const uploaded = await until(() =>
+    S()
+      .ads.find((a) => a.id === 'ad-e2e-1')
+      ?.images[0]?.startsWith('http'),
+  );
   check(uploaded, 'photo uploaded and ad saved with its server URL');
   const local = S().ads.find((a) => a.id === 'ad-e2e-1');
   check(local?.sellerId === 'me', "own ad still shows as 'me' after reconciling");
@@ -102,7 +109,10 @@ try {
   // Edit + price drop.
   S().dropPrice('ad-e2e-1', 3000);
   await until(async () => (await api.updateAd('ad-e2e-1', {})).ad.price === 3000);
-  check((await api.updateAd('ad-e2e-1', {})).ad.priceHistory?.length === 2, 'price drop recorded on server');
+  check(
+    (await api.updateAd('ad-e2e-1', {})).ad.priceHistory?.length === 2,
+    'price drop recorded on server',
+  );
 
   // Favourite a demo listing.
   S().toggleFavorite('ad-1');
@@ -121,11 +131,23 @@ try {
   }, 6000);
   const chat = S().chats.find((x) => x.id === chatId);
   check(replied, 'message delivered and seller reply received');
-  check(chat?.sellerId === 'u2' && chat.messages[0].senderId === 'me', 'chat mapped to me ↔ seller');
-  check(S().notifications.some((n) => n.type === 'chat'), 'reply produced a notification');
+  check(
+    chat?.sellerId === 'u2' && chat.messages[0].senderId === 'me',
+    'chat mapped to me ↔ seller',
+  );
+  check(
+    S().notifications.some((n) => n.type === 'chat'),
+    'reply produced a notification',
+  );
 
   // Review + block.
-  S().addReview({ sellerId: 'u2', authorId: 'me', authorName: 'Arjun Sen', rating: 5, text: 'Fast replies, honest seller.' });
+  S().addReview({
+    sellerId: 'u2',
+    authorId: 'me',
+    authorName: 'Arjun Sen',
+    rating: 5,
+    text: 'Fast replies, honest seller.',
+  });
   check(
     await until(async () => (await api.bootstrap()).reviews.some((r) => r.authorId === me.id)),
     'review stored on server',

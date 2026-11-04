@@ -7,7 +7,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export async function resolve(specifier, context, next) {
-  if (specifier.startsWith('.') && context.parentURL?.endsWith('.ts') && !/\.\w+$/.test(specifier)) {
+  if (
+    specifier.startsWith('.') &&
+    context.parentURL?.endsWith('.ts') &&
+    !/\.\w+$/.test(specifier)
+  ) {
     for (const ext of ['.ts', '.tsx']) {
       const url = new URL(specifier + ext, context.parentURL);
       if (existsSync(fileURLToPath(url))) return { url: url.href, shortCircuit: true };

@@ -8,7 +8,15 @@
  * Ids: the server's id for the signed-in user is mapped to 'me' so every screen keeps
  * working unchanged. A chat's `sellerId` is always the *other* person in the chat.
  */
-import { api, apiEnabled, ApiError, getToken, setToken, type RemoteChat, type RemoteMe } from './api';
+import {
+  api,
+  apiEnabled,
+  ApiError,
+  getToken,
+  setToken,
+  type RemoteChat,
+  type RemoteMe,
+} from './api';
 import { registerSellers } from './data';
 import { toast, useStore } from './store';
 import type { Ad, Chat, Message } from './types';
@@ -29,7 +37,10 @@ function fail(err: unknown, fallback: string) {
   const msg = err instanceof ApiError ? err.message : fallback;
   if (err instanceof ApiError && err.status === 401) {
     useStore.setState({ user: null });
-    toast('Your session expired — please sign in again', 'info', { label: 'Sign in', to: '/login' });
+    toast('Your session expired — please sign in again', 'info', {
+      label: 'Sign in',
+      to: '/login',
+    });
     return;
   }
   toast(msg, 'error');
@@ -94,7 +105,10 @@ export async function refresh() {
       useStore.setState({
         user: sessionFrom(data.me),
         area: data.me.area,
-        ads: data.ads.map((a) => ({ ...a, sellerId: a.sellerId === data.me!.id ? 'me' : a.sellerId })),
+        ads: data.ads.map((a) => ({
+          ...a,
+          sellerId: a.sellerId === data.me!.id ? 'me' : a.sellerId,
+        })),
         chats: data.chats.map((c) => mapChat(c, prev.get(c.id))),
         favorites: data.favorites,
         notifications: data.notifications,
@@ -115,7 +129,8 @@ export async function refresh() {
     }
   } catch (err) {
     // Offline: keep showing the cached store.
-    if (!(err instanceof ApiError && err.status === 0)) console.warn('[bazaar] refresh failed', err);
+    if (!(err instanceof ApiError && err.status === 0))
+      console.warn('[bazaar] refresh failed', err);
   }
 }
 
@@ -284,7 +299,10 @@ export const remote = {
         useStore.setState((s) => ({
           chats: s.chats.map((c) =>
             c.id === localId
-              ? { ...mapChat(chat, c), messages: c.messages.length ? c.messages : mapChat(chat).messages }
+              ? {
+                  ...mapChat(chat, c),
+                  messages: c.messages.length ? c.messages : mapChat(chat).messages,
+                }
               : c,
           ),
         }));
@@ -296,14 +314,22 @@ export const remote = {
     if (!active()) return;
     const chat = useStore.getState().chats.find((c) => c.id === chatId);
     const offerAmount =
-      msg.kind === 'offer' ? Number(msg.text.match(/₹([\d,]+)/)?.[1]?.replace(/,/g, '')) || undefined : undefined;
+      msg.kind === 'offer'
+        ? Number(msg.text.match(/₹([\d,]+)/)?.[1]?.replace(/,/g, '')) || undefined
+        : undefined;
     const go = () =>
-      api.sendMessage(chatId, { id: msg.id, text: msg.text, kind: msg.kind ?? 'text', offerAmount });
+      api.sendMessage(chatId, {
+        id: msg.id,
+        text: msg.text,
+        kind: msg.kind ?? 'text',
+        offerAmount,
+      });
     // A brand-new chat may still be on its way to the server.
-    const ensureChat = chat?.messages.length === 1 && chat ? api.startChat(chat.adId, chatId) : null;
+    const ensureChat =
+      chat?.messages.length === 1 && chat ? api.startChat(chat.adId, chatId) : null;
     (ensureChat ? ensureChat.then(go) : go())
       .then(() => window.setTimeout(() => void poll(), 2500))
-      .catch((e) => fail(e, "Message not sent — check your connection"));
+      .catch((e) => fail(e, 'Message not sent — check your connection'));
   },
 
   markChatRead(chatId: string) {
@@ -335,7 +361,8 @@ export const remote = {
   },
 
   setBlocked(sellerId: string, on: boolean) {
-    if (active()) api.setBlocked(sellerId, on).catch((e) => fail(e, "Couldn't update the block list"));
+    if (active())
+      api.setBlocked(sellerId, on).catch((e) => fail(e, "Couldn't update the block list"));
   },
 
   resetDemo() {

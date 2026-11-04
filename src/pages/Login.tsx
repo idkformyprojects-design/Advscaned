@@ -205,9 +205,13 @@ export default function Login() {
                 {busy ? 'Sending…' : 'Continue'} <ArrowRight size={17} />
               </button>
               <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
-                {apiEnabled
-                  ? "We'll text you a 4-digit code to confirm it's you."
-                  : <>Demo mode — no SMS is sent. Use any 10-digit number and code <b>1234</b>.</>}
+                {apiEnabled ? (
+                  "We'll text you a 4-digit code to confirm it's you."
+                ) : (
+                  <>
+                    Demo mode — no SMS is sent. Use any 10-digit number and code <b>1234</b>.
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -290,7 +294,11 @@ export default function Login() {
                 ))}
               </select>
               {error && <p className="mt-1.5 text-[12px] font-medium text-rose-600">{error}</p>}
-              <button onClick={finish} disabled={busy} className="btn btn-primary mt-4 w-full py-3.5">
+              <button
+                onClick={finish}
+                disabled={busy}
+                className="btn btn-primary mt-4 w-full py-3.5"
+              >
                 {busy ? 'Setting up…' : 'Start buying & selling'} <ArrowRight size={17} />
               </button>
               <p className="mt-3 text-center text-[11px] text-muted">

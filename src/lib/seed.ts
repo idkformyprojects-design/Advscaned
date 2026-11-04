@@ -431,7 +431,6 @@ export const SEED_REVIEWS: Review[] = [
   },
 ];
 
-
 export const SEED_CHATS = (): Chat[] => {
   const mk = (
     id: string,

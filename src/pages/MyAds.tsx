@@ -207,51 +207,51 @@ export default function MyAds() {
                     </button>
                   </div>
                 ) : (
-                <div className="mt-2.5 flex gap-1.5 border-t pt-2.5 hairline">
-                  <Link
-                    to={`/post/${ad.id}`}
-                    aria-label="Edit ad"
-                    className="grid w-9 place-items-center rounded-lg bg-ink-100 dark:bg-white/10"
-                  >
-                    <PenLine size={13} />
-                  </Link>
-                  <button
-                    onClick={() => setBoostTarget(ad.id)}
-                    disabled={ad.boosted}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-accent-500/12 py-2 text-[11.5px] font-bold text-accent-600 disabled:opacity-40 dark:text-accent-400"
-                  >
-                    <Sparkles size={12} /> {ad.boosted ? 'Boosted' : 'Boost'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      updateAd(ad.id, { status: ad.status === 'sold' ? 'active' : 'sold' });
-                      toast(
-                        ad.status === 'sold' ? 'Ad is live again' : 'Marked as sold 🎉',
-                        'success',
-                      );
-                    }}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-100 py-2 text-[11.5px] font-bold dark:bg-white/10"
-                  >
-                    {ad.status === 'sold' ? 'Relist' : 'Mark sold'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNewPrice(String(Math.round((ad.price * 0.92) / 500) * 500));
-                      setPriceTarget(ad.id);
-                    }}
-                    disabled={ad.status === 'sold'}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-100 py-2 text-[11.5px] font-bold disabled:opacity-40 dark:bg-white/10"
-                  >
-                    <ArrowDownRight size={12} /> Lower price
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(ad.id)}
-                    aria-label="Delete ad"
-                    className="grid w-9 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+                  <div className="mt-2.5 flex gap-1.5 border-t pt-2.5 hairline">
+                    <Link
+                      to={`/post/${ad.id}`}
+                      aria-label="Edit ad"
+                      className="grid w-9 place-items-center rounded-lg bg-ink-100 dark:bg-white/10"
+                    >
+                      <PenLine size={13} />
+                    </Link>
+                    <button
+                      onClick={() => setBoostTarget(ad.id)}
+                      disabled={ad.boosted}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-accent-500/12 py-2 text-[11.5px] font-bold text-accent-600 disabled:opacity-40 dark:text-accent-400"
+                    >
+                      <Sparkles size={12} /> {ad.boosted ? 'Boosted' : 'Boost'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        updateAd(ad.id, { status: ad.status === 'sold' ? 'active' : 'sold' });
+                        toast(
+                          ad.status === 'sold' ? 'Ad is live again' : 'Marked as sold 🎉',
+                          'success',
+                        );
+                      }}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-100 py-2 text-[11.5px] font-bold dark:bg-white/10"
+                    >
+                      {ad.status === 'sold' ? 'Relist' : 'Mark sold'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNewPrice(String(Math.round((ad.price * 0.92) / 500) * 500));
+                        setPriceTarget(ad.id);
+                      }}
+                      disabled={ad.status === 'sold'}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-100 py-2 text-[11.5px] font-bold disabled:opacity-40 dark:bg-white/10"
+                    >
+                      <ArrowDownRight size={12} /> Lower price
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(ad.id)}
+                      aria-label="Delete ad"
+                      className="grid w-9 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

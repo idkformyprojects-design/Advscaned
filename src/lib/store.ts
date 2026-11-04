@@ -41,7 +41,13 @@ interface AppState {
   onboarded: boolean;
   installedHintDismissed: boolean;
   blockedSellers: string[];
-  reports: { id: string; targetType: 'ad' | 'seller'; targetId: string; reason: string; at: number }[];
+  reports: {
+    id: string;
+    targetType: 'ad' | 'seller';
+    targetId: string;
+    reason: string;
+    at: number;
+  }[];
 
   login: (name: string, phone: string, area?: string) => void;
   logout: () => void;

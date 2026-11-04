@@ -51,9 +51,7 @@ export default function PostAd() {
   const [description, setDescription] = useState(editing?.description ?? '');
   const [price, setPrice] = useState(editing?.price ? String(editing.price) : '');
   const [condition, setCondition] = useState<Condition>(editing?.condition ?? 'good');
-  const [attributes, setAttributes] = useState<Record<string, string>>(
-    editing?.attributes ?? {},
-  );
+  const [attributes, setAttributes] = useState<Record<string, string>>(editing?.attributes ?? {});
   const [negotiable, setNegotiable] = useState(editing?.negotiable ?? true);
   const [delivery, setDelivery] = useState(editing?.delivery ?? false);
   const [locality, setLocality] = useState(editing?.area ?? area);
@@ -630,9 +628,11 @@ export default function PostAd() {
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => publish(true)} className="btn btn-outline flex-1">
-                Save draft
-              </button>
+              {(!editing || editing.status === 'draft') && (
+                <button onClick={() => publish(true)} className="btn btn-outline flex-1">
+                  Save draft
+                </button>
+              )}
               <button onClick={() => publish(false)} className="btn btn-primary flex-[1.6]">
                 <Rocket size={17} />{' '}
                 {editing && editing.status !== 'draft' ? 'Save changes' : 'Publish ad'}
