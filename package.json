@@ -1,0 +1,46 @@
+{
+  "name": "bazaar-marketplace",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Bazaar — a modern OLX-class classifieds marketplace PWA (React + TypeScript + Tailwind + Zustand).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "android:init": "npm run build && cap add android",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "cd android && ./gradlew assembleDebug",
+    "smoke": "npm run test:bundle && node scripts/smoke.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "flows": "npm run test:bundle && node scripts/flows.mjs",
+    "verify": "npm run typecheck && npm run smoke && npm run flows && npm run build",
+    "test:bundle": "esbuild src/main.tsx --bundle --outfile=.tmp/smoke.mjs --format=esm --define:process.env.NODE_ENV='\"development\"' --loader:.css=empty --log-level=error"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.3",
+    "postcss": "^8.5.6",
+    "prettier": "^3.9.10",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.19"
+  }
+}

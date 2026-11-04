@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+*.log
+ios
+
+# Capacitor Android project IS committed so CI can build the APK.
+# Its own android/.gitignore already excludes build outputs, copied web assets
+# and generated config files.
+
+# scratch
+.tmp
+
+# Deliverable archive (downloadable, not tracked)
+bazaar-marketplace.zip

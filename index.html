@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Bazaar — Buy & Sell Nearby</title>
+    <meta
+      name="description"
+      content="Bazaar is a modern classifieds marketplace. Buy and sell cars, phones, property, furniture and more from verified sellers near you."
+    />
+    <meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#0AA98C" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bazaar" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background: #f5f7f8;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #0b1220;
+        z-index: 9999;
+        transition: opacity 0.4s ease;
+      }
+      #boot .mark {
+        width: 64px;
+        height: 64px;
+        border-radius: 20px;
+        background: linear-gradient(140deg, #0aa98c, #067a66);
+        display: grid;
+        place-items: center;
+        animation: boot-pop 1.1s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+        box-shadow: 0 20px 50px -12px rgba(10, 169, 140, 0.6);
+      }
+      #boot .mark svg {
+        width: 32px;
+        height: 32px;
+        color: #fff;
+      }
+      @keyframes boot-pop {
+        from {
+          transform: scale(0.94);
+        }
+        to {
+          transform: scale(1.04);
+        }
+      }
+    </style>
+  </head>
+  <body class="h-full">
+    <script>
+      try {
+        var raw = localStorage.getItem('bazaar-store-v1');
+        var theme = raw && JSON.parse(raw).state ? JSON.parse(raw).state.theme : 'light';
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
+    <div id="root"></div>
+    <div id="boot" aria-hidden="true">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h18l-1.5 12.5a2 2 0 0 1-2 1.5H6.5a2 2 0 0 1-2-1.5L3 7Z" />
+          <path d="M8 7V5.5a4 4 0 0 1 8 0V7" />
+        </svg>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

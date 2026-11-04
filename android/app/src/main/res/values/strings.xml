@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bazaar</string>
+    <string name="title_activity_main">Bazaar</string>
+    <string name="package_name">com.bazaar.marketplace</string>
+    <string name="custom_url_scheme">com.bazaar.marketplace</string>
+</resources>
