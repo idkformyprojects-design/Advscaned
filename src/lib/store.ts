@@ -10,7 +10,7 @@ import {
 import type { Ad, AppNotification, Chat, Message, Review, SavedSearch, SessionUser } from './types';
 import { sellerById } from './data';
 import { uid } from './utils';
-import { remote } from './sync';
+import { remote } from './backend';
 import type { ServerConfig } from './api';
 
 export type ToastKind = 'success' | 'error' | 'info';
@@ -273,7 +273,8 @@ export const useStore = create<AppState>()(
         if (existing) return existing.id;
         const ad = get().ads.find((a) => a.id === adId);
         const chat: Chat = {
-          id: uid('chat'),
+          // Firebase uses a fixed id per buyer+ad, so reopening finds the same thread.
+          id: remote.chatIdFor(adId) ?? uid('chat'),
           adId,
           buyerId: 'me',
           sellerId: ad?.sellerId ?? 'u1',

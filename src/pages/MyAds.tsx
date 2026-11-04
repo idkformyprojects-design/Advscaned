@@ -19,7 +19,7 @@ import { TopBar } from '../components/TopBar';
 import { AdThumb } from '../components/AdCard';
 import { Badge, EmptyState, Sheet } from '../components/ui';
 import { toast, useStore } from '../lib/store';
-import { payForBoost } from '../lib/sync';
+import { payForBoost } from '../lib/backend';
 import { cn, inr, timeAgo } from '../lib/utils';
 import type { AdStatus } from '../lib/types';
 

@@ -545,7 +545,7 @@ export default function PostAd() {
               <p className="mt-1 flex items-center gap-1.5 text-[14px] font-bold">
                 {user?.name} <BadgeCheck size={14} className="text-brand-500" />
               </p>
-              <p className="text-[12px] text-muted">{user?.phone} · verified</p>
+              <p className="text-[12px] text-muted">{user?.phone || user?.email} · verified</p>
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
                 Your number stays hidden until you choose to reveal it. Buyers reach you through
                 Bazaar chat first.

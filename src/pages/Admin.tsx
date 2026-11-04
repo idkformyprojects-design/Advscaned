@@ -16,16 +16,18 @@ import {
 import { TopBar } from '../components/TopBar';
 import { AdThumb } from '../components/AdCard';
 import { Avatar, Badge, EmptyState, Sheet, Spinner } from '../components/ui';
-import {
-  api,
-  apiEnabled,
-  ApiError,
-  type AdminReport,
-  type AdminStats,
-  type ResolveAction,
-} from '../lib/api';
+import { ApiError, type AdminReport, type AdminStats, type ResolveAction } from '../lib/api';
+import { adminApi, backend, backendEnabled } from '../lib/backend';
 import { toast, useStore } from '../lib/store';
 import { cn, inr, timeAgo } from '../lib/utils';
+
+/** Readable message from an API error or a Firebase callable error. */
+const errorText = (e: unknown, fallback: string) =>
+  e instanceof ApiError
+    ? e.message
+    : e instanceof Error && e.message && !/^internal$/i.test(e.message)
+      ? e.message
+      : fallback;
 
 const ACTION_COPY: Record<ResolveAction, { title: string; body: string; cta: string }> = {
   dismiss: {
@@ -62,17 +64,17 @@ export default function Admin() {
     null,
   );
 
-  const isAdmin = apiEnabled && user?.role === 'admin';
+  const isAdmin = backendEnabled && user?.role === 'admin';
 
   const load = useCallback(async () => {
     if (!isAdmin) return;
     setError('');
     try {
-      const [s, r] = await Promise.all([api.adminStats(), api.adminReports(tab)]);
+      const [s, r] = await Promise.all([adminApi.stats(), adminApi.reports(tab)]);
       setStats(s);
       setReports(r.reports);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not load reports');
+      setError(errorText(e, 'Could not load reports'));
     }
   }, [isAdmin, tab]);
 
@@ -89,9 +91,11 @@ export default function Admin() {
           icon={<ShieldCheck size={26} />}
           title="Moderators only"
           body={
-            apiEnabled
-              ? 'Your account does not have moderator access. Ask the server owner to add your number to ADMIN_PHONES.'
-              : 'Moderation needs the Bazaar server. Build the app with VITE_API_URL to use it.'
+            backend === 'firebase'
+              ? 'Your account does not have moderator access. Ask the owner to add your Google email to ADMIN_EMAILS.'
+              : backendEnabled
+                ? 'Your account does not have moderator access. Ask the server owner to add your number to ADMIN_PHONES.'
+                : 'Moderation needs a live backend (Firebase or the Bazaar server).'
           }
           action="Back to account"
           onAction={() => navigate('/profile')}
@@ -104,7 +108,7 @@ export default function Admin() {
     if (!pending) return;
     setBusy(true);
     try {
-      await api.resolveReport(pending.report.id, pending.action);
+      await adminApi.resolve(pending.report.id, pending.action);
       toast(
         {
           dismiss: 'Report dismissed',
@@ -117,7 +121,7 @@ export default function Admin() {
       setPending(null);
       await load();
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : 'Action failed', 'error');
+      toast(errorText(e, 'Action failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -125,11 +129,11 @@ export default function Admin() {
 
   const unban = async (sellerId: string) => {
     try {
-      await api.unbanUser(sellerId);
+      await adminApi.unban(sellerId);
       toast('Seller unbanned', 'info');
       await load();
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : 'Action failed', 'error');
+      toast(errorText(e, 'Action failed'), 'error');
     }
   };
 

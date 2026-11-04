@@ -571,27 +571,39 @@ export default function AdDetail() {
           <p className="text-[12px] text-muted">
             Usually replies {seller.responseTime} · {seller.responseRate}% response rate
           </p>
-          <div className="mt-4 w-full rounded-xl border p-3 text-center hairline">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Phone</p>
-            <p className="mt-1 text-[18px] font-extrabold tracking-wider">
-              {revealed ? seller.phone : '+91 98••• ••••2'}
+          {seller.phone ? (
+            <>
+            <div className="mt-4 w-full rounded-xl border p-3 text-center hairline">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Phone</p>
+              <p className="mt-1 text-[18px] font-extrabold tracking-wider">
+                {revealed ? seller.phone : '+91 98••• ••••2'}
+              </p>
+            </div>
+            <a
+              href={`tel:${seller.phone.replace(/\s/g, '')}`}
+              onClick={(e) => {
+                if (!revealed) {
+                  e.preventDefault();
+                  setRevealed(true);
+                  toast('Number revealed — call after 9am for best response', 'info');
+                }
+              }}
+              className="btn btn-primary mt-3 w-full"
+            >
+              <Phone size={17} /> {revealed ? 'Call now' : 'Reveal number'}
+            </a>
+            </>
+          ) : (
+            <p className="mt-4 w-full rounded-xl border p-3 text-center text-[12.5px] leading-relaxed text-muted hairline">
+              This seller hasn't shared a phone number. Chat in the app — your number stays private
+              too.
             </p>
-          </div>
-          <a
-            href={`tel:${seller.phone.replace(/\s/g, '')}`}
-            onClick={(e) => {
-              if (!revealed) {
-                e.preventDefault();
-                setRevealed(true);
-                toast('Number revealed — call after 9am for best response', 'info');
-              }
-            }}
-            className="btn btn-primary mt-3 w-full"
+          )}
+          <button
+            onClick={openChat}
+            className={cn('btn mt-2 w-full', seller.phone ? 'btn-outline' : 'btn-primary mt-3')}
           >
-            <Phone size={17} /> {revealed ? 'Call now' : 'Reveal number'}
-          </a>
-          <button onClick={openChat} className="btn btn-outline mt-2 w-full">
-            <MessageCircle size={16} /> Message instead
+            <MessageCircle size={16} /> {seller.phone ? 'Message instead' : 'Message seller'}
           </button>
           <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
             By calling you agree not to spam. Bazaar masks numbers to protect sellers.

@@ -13,6 +13,7 @@ import {
 import { useStore } from '../lib/store';
 import { api, apiEnabled, ApiError, setToken, type RemoteMe } from '../lib/api';
 import { completeSignIn } from '../lib/sync';
+import { backend, loadFirebase } from '../lib/backend';
 import { AREAS } from '../lib/data';
 import { cn, vibrate } from '../lib/utils';
 import { Logo } from '../components/AppShell';
@@ -38,10 +39,41 @@ export default function Login() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [session, setSession] = useState<{ token: string; user: RemoteMe } | null>(null);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const google = backend === 'firebase';
+  // Holds the redirect while a brand-new Google account picks its name and area.
+  const [hold, setHold] = useState(false);
 
   useEffect(() => {
-    if (user) navigate(from, { replace: true });
-  }, [user, from, navigate]);
+    if (user && !hold) navigate(from, { replace: true });
+  }, [user, hold, from, navigate]);
+
+  const googleSignIn = async () => {
+    setError('');
+    setBusy(true);
+    setHold(true);
+    try {
+      const fb = await loadFirebase();
+      const res = await fb.signInWithGoogle();
+      if (res?.isNew) {
+        setName(fb.currentUserName());
+        setStep('name');
+        return;
+      }
+      setHold(false);
+    } catch (e) {
+      setHold(false);
+      const code = (e as { code?: string }).code ?? '';
+      setError(
+        code === 'auth/network-request-failed'
+          ? "Can't reach Google right now — check your connection"
+          : code === 'auth/user-disabled'
+            ? 'This account has been suspended. Contact support if you think this is a mistake.'
+            : "Google sign-in didn't work — please try again",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (step !== 'otp') return;
@@ -121,6 +153,20 @@ export default function Login() {
 
   const finish = async () => {
     const finalName = name.trim() || 'Bazaar User';
+    if (google) {
+      setBusy(true);
+      try {
+        await (await loadFirebase()).saveProfile(finalName, area);
+        vibrate(16);
+        setHold(false);
+        navigate(from, { replace: true });
+      } catch {
+        setError("Couldn't save your profile — please try again");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (apiEnabled && session) {
       setBusy(true);
       try {
@@ -179,7 +225,25 @@ export default function Login() {
         </div>
 
         <div className="mt-5">
-          {step === 'phone' && (
+          {step === 'phone' && google && (
+            <div className="animate-fade-in">
+              <button
+                onClick={googleSignIn}
+                disabled={busy}
+                className="btn w-full justify-center gap-2.5 border bg-white py-3.5 text-[14.5px] font-semibold text-slate-800 hairline dark:bg-white/95"
+              >
+                <GoogleMark />
+                {busy ? 'Opening Google…' : 'Continue with Google'}
+              </button>
+              {error && <p className="mt-2 text-[12px] font-medium text-rose-600">{error}</p>}
+              <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
+                We only use your Google name and email to create your account. Your email is never
+                shown to other users.
+              </p>
+            </div>
+          )}
+
+          {step === 'phone' && !google && (
             <div className="animate-fade-in">
               <label className="label">Mobile number</label>
               <div className="flex items-center gap-2">
@@ -334,5 +398,16 @@ export default function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
   );
 }

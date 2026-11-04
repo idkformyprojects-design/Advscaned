@@ -23,7 +23,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Falls back to `npm install` while the lockfile catches up with package.json
+        # (the lockfile workflow commits the refreshed package-lock.json).
+        run: npm ci || npm install --no-audit --no-fund
 
       - name: Type-check
         run: npm run typecheck
@@ -43,6 +45,7 @@ jobs:
       - name: Production build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_FIREBASE_CONFIG: ${{ vars.VITE_FIREBASE_CONFIG }}
         run: npm run build
 
       - name: Upload web build
@@ -53,7 +56,7 @@ jobs:
           retention-days: 7
 
   firebase:
-    name: Firebase rules + functions
+    name: Firebase rules + functions + app e2e
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,11 +64,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
+
+      - name: Install app dependencies
+        run: npm ci || npm install --no-audit --no-fund
 
       - name: Install functions dependencies
         working-directory: functions
@@ -76,11 +83,11 @@ jobs:
           printf 'ADMIN_EMAILS=admin@test.dev\nRAZORPAY_KEY_ID=rzp_test_key\nBAZAAR_FAKE_RAZORPAY=1\n' > functions/.env.local
           printf 'RAZORPAY_KEY_SECRET=rzp_test_secret\nRAZORPAY_WEBHOOK_SECRET=whsec_test\n' > functions/.secret.local
 
-      - name: Security rules + Cloud Functions tests (emulators)
+      - name: Security rules + Cloud Functions tests, then the app against them (emulators)
         run: >
           npx -y firebase-tools@latest emulators:exec
           --project demo-bazaar --only auth,firestore,functions,storage
-          "npm --prefix functions test"
+          "npm --prefix functions test && node scripts/firebase-e2e.mjs"
 
   android:
     name: Android APK
@@ -113,11 +120,14 @@ jobs:
           "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install dependencies
-        run: npm ci
+        # Falls back to `npm install` while the lockfile catches up with package.json
+        # (the lockfile workflow commits the refreshed package-lock.json).
+        run: npm ci || npm install --no-audit --no-fund
 
       - name: Build web bundle
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_FIREBASE_CONFIG: ${{ vars.VITE_FIREBASE_CONFIG }}
         run: npm run build
 
       - name: Sync Capacitor project

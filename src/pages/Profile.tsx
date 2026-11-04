@@ -111,7 +111,7 @@ export default function Profile() {
               <p className="flex items-center gap-1.5 text-[17px] font-extrabold">
                 {user.name} <BadgeCheck size={16} className="text-brand-200" />
               </p>
-              <p className="text-[12px] text-white/70">{user.phone}</p>
+              <p className="text-[12px] text-white/70">{user.phone || user.email}</p>
               <p className="mt-1 flex items-center gap-1 text-[11px] text-white/60">
                 <MapPin size={11} /> {area}, Kolkata
               </p>

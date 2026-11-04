@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useStore } from './lib/store';
-import { startSync } from './lib/sync';
+import { startSync } from './lib/backend';
 import Home from './pages/Home';
 import SearchPage from './pages/SearchPage';
 import AdDetail from './pages/AdDetail';

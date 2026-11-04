@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Bazaar — a modern OLX-class classifieds marketplace PWA (React + TypeScript + Tailwind + Zustand).",
+  "description": "Bazaar \u2014 a modern OLX-class classifieds marketplace PWA (React + TypeScript + Tailwind + Zustand).",
   "engines": {
     "node": ">=22.18"
   },
@@ -25,12 +25,14 @@
     "server:test": "node --no-warnings --test server/test/*.test.js",
     "server:seed-json": "node --no-warnings scripts/export-seed.mjs",
     "test:sync": "node --no-warnings --experimental-eventsource scripts/sync-e2e.mjs",
-    "keystore": "bash scripts/make-keystore.sh"
+    "keystore": "bash scripts/make-keystore.sh",
+    "test:firebase": "npx -y firebase-tools@latest emulators:exec --project demo-bazaar --only auth,firestore,functions,storage \"npm --prefix functions test && node scripts/firebase-e2e.mjs\""
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "clsx": "^2.1.1",
+    "firebase": "^12.0.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
