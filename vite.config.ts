@@ -33,5 +33,5 @@ export default defineConfig({
     watch: { ignored: ['**/android/**', '**/ios/**', '**/dist/**'] },
   },
   preview: { host: '0.0.0.0', port: 4173, allowedHosts: true },
-  build: { target: 'es2019', chunkSizeWarningLimit: 1200 },
+  build: { target: 'es2020', chunkSizeWarningLimit: 1200 },
 });

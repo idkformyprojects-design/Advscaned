@@ -20,6 +20,7 @@ import SellerProfile from './pages/SellerProfile';
 import Insights from './pages/Insights';
 import NotFound from './pages/NotFound';
 import Admin from './pages/Admin';
+import Legal from './pages/Legal';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const user = useStore((s) => s.user);
@@ -131,6 +132,7 @@ export default function App() {
             }
           />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="legal/:doc" element={<Legal />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

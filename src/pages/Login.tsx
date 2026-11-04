@@ -366,7 +366,15 @@ export default function Login() {
                 {busy ? 'Setting up…' : 'Start buying & selling'} <ArrowRight size={17} />
               </button>
               <p className="mt-3 text-center text-[11px] text-muted">
-                By continuing you agree to our Terms of Use and Privacy Policy.
+                By continuing you agree to our{' '}
+                <Link to="/legal/terms" className="font-semibold underline">
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link to="/legal/privacy" className="font-semibold underline">
+                  Privacy Policy
+                </Link>
+                .
               </p>
             </div>
           )}

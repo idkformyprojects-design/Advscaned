@@ -26,6 +26,10 @@ const routes = [
   '/post',
   '/post/ad-1',
   '/admin',
+  '/legal/privacy',
+  '/legal/terms',
+  '/legal/support',
+  '/legal/delete-account',
   '/nope',
 ];
 

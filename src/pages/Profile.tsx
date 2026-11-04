@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bell,
   ChevronRight,
+  FileText,
   HelpCircle,
   Heart,
   Info,
@@ -19,6 +20,7 @@ import {
   MessageCircle,
   Sparkles,
   Star,
+  Trash2,
   TrendingUp,
 } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
@@ -26,6 +28,8 @@ import { Avatar, Sheet, Toggle } from '../components/ui';
 import { AREAS, sellerById } from '../lib/data';
 import { toast, useStore } from '../lib/store';
 import { cn } from '../lib/utils';
+import { backend, loadFirebase } from '../lib/backend';
+import { LEGAL } from '../lib/legal';
 
 export default function Profile() {
   const user = useStore((s) => s.user);
@@ -72,6 +76,35 @@ export default function Profile() {
     );
   };
   const [resetOpen, setResetOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteAccount = async () => {
+    if (backend === 'api') {
+      window.location.href = `mailto:${LEGAL.supportEmail}?subject=${encodeURIComponent('Delete my account')}`;
+      setDeleteOpen(false);
+      return;
+    }
+    setDeleting(true);
+    try {
+      if (backend === 'firebase') await (await loadFirebase()).deleteMyAccount();
+      logout();
+      if (backend === 'demo') resetDemo();
+      setDeleteOpen(false);
+      toast('Your account has been deleted', 'info');
+      navigate('/');
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? '';
+      toast(
+        /unauthenticated|requires-recent-login/.test(code)
+          ? 'Please sign out, sign in again, then retry'
+          : "Couldn't delete your account — please try again",
+        'error',
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
   const [helpOpen, setHelpOpen] = useState(false);
 
   const mine = ads.filter((a) => a.sellerId === 'me');
@@ -228,8 +261,9 @@ export default function Profile() {
             hint="How to trade safely"
             onClick={() => setHelpOpen(true)}
           />
-          <Row icon={HelpCircle} label="Help centre" onClick={() => setHelpOpen(true)} />
-          <Row icon={Info} label="About Bazaar" hint="v1.0.0" onClick={() => setHelpOpen(true)} />
+          <Row icon={HelpCircle} label="Help & grievances" to="/legal/support" />
+          <Row icon={FileText} label="Privacy policy" to="/legal/privacy" />
+          <Row icon={Info} label="Terms of use" hint="v1.0.0" to="/legal/terms" />
         </Section>
 
         {blocked.length > 0 && (
@@ -257,16 +291,18 @@ export default function Profile() {
 
         {/* Account */}
         <Section title="Account">
-          <button
-            onClick={() => setResetOpen(true)}
-            className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
-          >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-200">
-              <RotateCcw size={15} />
-            </span>
-            <span className="flex-1 text-[13.5px] font-semibold">Reset demo data</span>
-            <ChevronRight size={16} className="text-muted" />
-          </button>
+          {backend !== 'firebase' && (
+            <button
+              onClick={() => setResetOpen(true)}
+              className="flex w-full items-center gap-3 px-3.5 py-3 text-left"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-100 text-ink-600 dark:bg-white/10 dark:text-ink-200">
+                <RotateCcw size={15} />
+              </span>
+              <span className="flex-1 text-[13.5px] font-semibold">Reset demo data</span>
+              <ChevronRight size={16} className="text-muted" />
+            </button>
+          )}
           <button
             onClick={() => {
               logout();
@@ -278,6 +314,15 @@ export default function Profile() {
               <LogOut size={15} />
             </span>
             <span className="flex-1 text-[13.5px] font-semibold">Sign out</span>
+          </button>
+          <button
+            onClick={() => setDeleteOpen(true)}
+            className="flex w-full items-center gap-3 px-3.5 py-3 text-left text-rose-600"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-50 dark:bg-rose-500/15">
+              <Trash2 size={15} />
+            </span>
+            <span className="flex-1 text-[13.5px] font-semibold">Delete account</span>
           </button>
         </Section>
 
@@ -330,6 +375,33 @@ export default function Profile() {
         >
           Back to browsing
         </Link>
+      </Sheet>
+
+      <Sheet open={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete your account?">
+        <p className="text-[13px] leading-relaxed text-muted">
+          {backend === 'api'
+            ? `We'll open an email to ${LEGAL.supportEmail}. Send it from this account and we'll delete everything within 7 days.`
+            : 'This permanently deletes your profile, all your ads and photos, saved ads and reviews you wrote. Messages you sent stay visible to the other person as “Deleted user”. This cannot be undone.'}
+        </p>
+        <Link
+          to="/legal/delete-account"
+          onClick={() => setDeleteOpen(false)}
+          className="mt-2 inline-block text-[12px] font-semibold text-brand-600"
+        >
+          What gets deleted
+        </Link>
+        <div className="mt-4 flex gap-2">
+          <button onClick={() => setDeleteOpen(false)} className="btn btn-outline flex-1">
+            Keep account
+          </button>
+          <button
+            onClick={deleteAccount}
+            disabled={deleting}
+            className="btn flex-1 bg-rose-600 text-white hover:bg-rose-700"
+          >
+            {deleting ? 'Deleting…' : backend === 'api' ? 'Email support' : 'Delete forever'}
+          </button>
+        </div>
       </Sheet>
 
       <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Reset demo data?">
