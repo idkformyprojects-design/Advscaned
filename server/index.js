@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { openDb } from './db.js';
-import { createApp } from './app.js';
+import { createApp, normalizePhone } from './app.js';
 
 /*
  * Bazaar API server.
@@ -18,6 +18,9 @@ import { createApp } from './app.js';
  *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM   → send OTP by Twilio SMS
  *   SMS_WEBHOOK_URL [+ SMS_WEBHOOK_TOKEN]                → or POST {phone, code, message} to your SMS provider
  *   DEMO_AUTOREPLY       "0" turns off automatic replies from the seeded demo sellers
+ *   ADMIN_PHONES         comma-separated mobile numbers that get moderator access on sign-in
+ *   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET  → paid boosts (₹149 / 7 days). Without them boosts are free.
+ *   RAZORPAY_WEBHOOK_SECRET               → verifies POST /api/payments/webhook
  */
 
 const env = process.env;
@@ -74,6 +77,19 @@ const app = createApp({
   publicUrl: env.PUBLIC_URL,
   corsOrigins: env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',').map((s) => s.trim()) : '*',
   demoReplyMs: env.DEMO_AUTOREPLY === '0' ? false : 1800,
+  adminPhones: (env.ADMIN_PHONES ?? '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(normalizePhone),
+  payments:
+    env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET
+      ? {
+          keyId: env.RAZORPAY_KEY_ID,
+          keySecret: env.RAZORPAY_KEY_SECRET,
+          webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+        }
+      : undefined,
 });
 
 const port = Number(env.PORT ?? 8787);
@@ -82,6 +98,7 @@ server.listen(port, () => {
   console.log(`Bazaar API listening on http://localhost:${port}`);
   if (devOtpCode) console.log(`  ⚠ Demo OTP mode — every login code is ${devOtpCode}`);
   else console.log('  OTPs are sent by SMS');
+  console.log(env.RAZORPAY_KEY_ID ? '  Boosts are paid via Razorpay' : '  Boosts are free (Razorpay not configured)');
 });
 
 const shutdown = () => {

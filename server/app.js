@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tx } from './db.js';
@@ -16,6 +16,11 @@ const OTP_MAX_PER_HOUR = 6;
 const OTP_MAX_ATTEMPTS = 5;
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_UPLOAD = 4 * 1024 * 1024;
+const BOOST_DAYS = 7;
+const BOOST_PRICE_PAISE = 14_900; // ₹149
+const STREAM_PING_MS = 25_000;
+const AUTO_REVIEW_REPORTS = 3; // distinct reporters before an ad is hidden for review
+const RESOLVE_ACTIONS = new Set(['dismiss', 'remove', 'ban', 'restore']);
 
 const CATEGORIES = new Set([
   'cars', 'mobiles', 'properties', 'bikes', 'electronics', 'furniture',
@@ -103,7 +108,8 @@ function adOut(row) {
     views: row.views,
     saves: row.saves,
     featured: !!row.featured,
-    boosted: !!row.boosted,
+    boosted: !!row.boosted && (row.boosted_until == null || row.boosted_until > Date.now()),
+    ...(row.boosted_until ? { boostedUntil: row.boosted_until } : {}),
     negotiable: !!row.negotiable,
     delivery: !!row.delivery,
     status: row.status,
@@ -137,6 +143,7 @@ function meOut(u) {
     area: u.area,
     avatarColor: u.avatar_color,
     joined: u.created_at,
+    role: u.role === 'admin' ? 'admin' : 'user',
   };
 }
 
@@ -195,6 +202,8 @@ export function createApp(opts) {
     publicUrl,
     corsOrigins = '*',
     demoReplyMs = 1800,
+    adminPhones = [],
+    payments,
     now = Date.now,
   } = opts;
   mkdirSync(uploadsDir, { recursive: true });
@@ -204,18 +213,90 @@ export function createApp(opts) {
   const userById = (id) => q('SELECT * FROM users WHERE id = ?').get(id);
   const adById = (id) => q('SELECT * FROM ads WHERE id = ?').get(id);
 
+  /* ---- live updates (server-sent events) ---- */
+  const streams = new Map(); // userId -> Set<ServerResponse>
+  function pushTo(userId, event, data) {
+    for (const res of streams.get(userId) ?? []) {
+      try {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      } catch {
+        /* closed */
+      }
+    }
+  }
+
   function notify(userId, type, title, body, href) {
+    const id = newId('n');
     q(`INSERT INTO notifications (id, user_id, type, title, body, href, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(newId('n'), userId, type, title, body, href ?? null, now());
+       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, userId, type, title, body, href ?? null, now());
+    pushTo(userId, 'update', { type, id });
+  }
+
+  function userForToken(token) {
+    if (!token) return null;
+    const s = q('SELECT * FROM sessions WHERE token_hash = ?').get(sha256(token));
+    if (!s || s.expires_at < now()) return null;
+    const u = userById(s.user_id);
+    return u && !u.banned ? u : null;
   }
 
   function authUser(req) {
     const header = req.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-    if (!token) return null;
-    const s = q('SELECT * FROM sessions WHERE token_hash = ?').get(sha256(token));
-    if (!s || s.expires_at < now()) return null;
-    return userById(s.user_id) ?? null;
+    return userForToken(header.startsWith('Bearer ') ? header.slice(7).trim() : '');
+  }
+
+  function requireAdmin(ctx) {
+    const user = requireUser(ctx);
+    if (user.role !== 'admin') throw new HttpError(403, 'Moderators only');
+    return user;
+  }
+
+  /** Extends (or starts) a 7-day boost and tells the seller. */
+  function applyBoost(adId) {
+    const ad = adById(adId);
+    if (!ad) return;
+    const from = Math.max(now(), ad.boosted_until ?? 0);
+    const until = from + BOOST_DAYS * DAY;
+    q('UPDATE ads SET boosted = 1, featured = 1, boosted_until = ?, updated_at = ? WHERE id = ?').run(
+      until, now(), ad.id,
+    );
+    notify(ad.seller_id, 'boost', `Boost active · ${BOOST_DAYS} days`,
+      `“${ad.title}” is now featured at the top of nearby searches.`, `/ad/${ad.id}`);
+  }
+
+  function markPaid(orderId, paymentId) {
+    const pay = q('SELECT * FROM payments WHERE order_id = ?').get(orderId);
+    if (!pay) return null;
+    if (pay.status !== 'paid') {
+      tx(db, () => {
+        q("UPDATE payments SET status = 'paid', payment_id = ?, paid_at = ? WHERE order_id = ?").run(
+          paymentId, now(), orderId,
+        );
+        applyBoost(pay.ad_id);
+      });
+    }
+    return q('SELECT * FROM payments WHERE order_id = ?').get(orderId);
+  }
+
+  const hmacHex = (secret, data) => createHmac('sha256', secret).update(data).digest('hex');
+  const safeEqualHex = (a, b) => {
+    const x = Buffer.from(String(a), 'utf8');
+    const y = Buffer.from(String(b), 'utf8');
+    return x.length === y.length && timingSafeEqual(x, y);
+  };
+
+  async function createRazorpayOrder(amount, receipt, notes) {
+    if (payments.createOrder) return payments.createOrder(amount, receipt, notes);
+    const res = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${payments.keyId}:${payments.keySecret}`).toString('base64'),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amount, currency: 'INR', receipt, notes }),
+    });
+    if (!res.ok) throw new HttpError(502, 'Payment provider is unavailable — try again shortly');
+    return res.json();
   }
 
   function requireUser(ctx) {
@@ -369,6 +450,7 @@ export function createApp(opts) {
     q('DELETE FROM otps WHERE phone = ?').run(phone);
 
     let user = q('SELECT * FROM users WHERE phone = ?').get(phone);
+    if (user?.banned) throw new HttpError(403, 'This account has been suspended');
     const isNew = !user;
     if (!user) {
       const id = newId('usr');
@@ -381,6 +463,10 @@ export function createApp(opts) {
         now(),
       );
       user = userById(id);
+    }
+    if (adminPhones.includes(phone) && user.role !== 'admin') {
+      q("UPDATE users SET role = 'admin' WHERE id = ?").run(user.id);
+      user = userById(user.id);
     }
     const token = randomBytes(32).toString('base64url');
     q('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(
@@ -444,6 +530,11 @@ export function createApp(opts) {
         ? q('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100').all(me.id).map(notificationOut)
         : [],
       blocked,
+      config: {
+        payments: !!payments,
+        boostPricePaise: BOOST_PRICE_PAISE,
+        boostDays: BOOST_DAYS,
+      },
     };
   });
 
@@ -508,7 +599,8 @@ export function createApp(opts) {
 
   route('GET', '/api/ads/:id', (ctx) => {
     const ad = adById(ctx.params.id);
-    if (!ad || (ad.status === 'draft' && ad.seller_id !== ctx.user?.id))
+    const publicStatus = ad?.status === 'active' || ad?.status === 'sold';
+    if (!ad || (!publicStatus && ad.seller_id !== ctx.user?.id))
       throw new HttpError(404, 'Ad not found');
     return { ad: adOut(ad), seller: sellerOut(userById(ad.seller_id)) };
   });
@@ -576,6 +668,10 @@ export function createApp(opts) {
 
   route('PATCH', '/api/ads/:id', (ctx) => {
     const ad = ownAd(ctx, ctx.params.id);
+    if (ad.status === 'pending' || ad.status === 'removed')
+      throw new HttpError(423, ad.status === 'pending'
+        ? 'This ad is under review — you can edit it once our team has checked it'
+        : 'This ad was removed by moderators and can no longer be changed');
     const f = readAdFields(ctx.body, true);
     if (f.status === 'active' && ad.status === 'draft') {
       const title = f.title ?? ad.title;
@@ -620,14 +716,66 @@ export function createApp(opts) {
     return { ok: true };
   });
 
+  /** Free boost — only while payments are not configured (demo / testing). */
   route('POST', '/api/ads/:id/boost', (ctx) => {
     const ad = ownAd(ctx, ctx.params.id);
     if (ad.status !== 'active') throw bad('Only live ads can be boosted');
-    // Payment would be confirmed here (Razorpay/Stripe webhook) before activating.
-    q('UPDATE ads SET boosted = 1, featured = 1, updated_at = ? WHERE id = ?').run(now(), ad.id);
-    notify(ad.seller_id, 'boost', 'Boost active · 7 days',
-      `“${ad.title}” is now featured at the top of nearby searches.`, `/ad/${ad.id}`);
+    if (payments) throw new HttpError(402, 'Boosts are paid — start a payment first');
+    applyBoost(ad.id);
     return { ad: adOut(adById(ad.id)) };
+  });
+
+  /* ---- payments (Razorpay) ---- */
+
+  route('POST', '/api/ads/:id/boost/order', async (ctx) => {
+    const ad = ownAd(ctx, ctx.params.id);
+    if (ad.status !== 'active') throw bad('Only live ads can be boosted');
+    if (!payments) throw bad('Payments are not set up on this server');
+    const order = await createRazorpayOrder(BOOST_PRICE_PAISE, `boost_${ad.id}`.slice(0, 40), {
+      adId: ad.id,
+      userId: ctx.user.id,
+    });
+    q(`INSERT INTO payments (order_id, user_id, ad_id, purpose, amount, currency, created_at)
+       VALUES (?, ?, ?, 'boost', ?, 'INR', ?)`).run(order.id, ctx.user.id, ad.id, BOOST_PRICE_PAISE, now());
+    return {
+      orderId: order.id,
+      amount: BOOST_PRICE_PAISE,
+      currency: 'INR',
+      keyId: payments.keyId,
+      description: `${BOOST_DAYS}-day boost · ${ad.title}`.slice(0, 80),
+    };
+  });
+
+  /** Called by the app after Razorpay Checkout succeeds. */
+  route('POST', '/api/payments/verify', (ctx) => {
+    const me = requireUser(ctx);
+    if (!payments) throw bad('Payments are not set up on this server');
+    const orderId = str(ctx.body.orderId, 'orderId', { max: 64 });
+    const paymentId = str(ctx.body.paymentId, 'paymentId', { max: 64 });
+    const signature = str(ctx.body.signature, 'signature', { max: 128 });
+    const pay = q('SELECT * FROM payments WHERE order_id = ? AND user_id = ?').get(orderId, me.id);
+    if (!pay) throw new HttpError(404, 'Payment not found');
+    if (!safeEqualHex(hmacHex(payments.keySecret, `${orderId}|${paymentId}`), signature))
+      throw bad('Payment could not be verified');
+    markPaid(orderId, paymentId);
+    return { ad: adOut(adById(pay.ad_id)), status: 'paid' };
+  });
+
+  /**
+   * Razorpay webhook (Dashboard → Webhooks → events payment.captured, order.paid).
+   * Completes the boost even if the app was closed before verifying.
+   */
+  route('POST', '/api/payments/webhook', (ctx) => {
+    if (!payments?.webhookSecret) throw new HttpError(404, 'Not found');
+    const sig = ctx.req.headers['x-razorpay-signature'];
+    if (!sig || !safeEqualHex(hmacHex(payments.webhookSecret, ctx.raw), sig))
+      throw bad('Invalid signature');
+    const event = ctx.body.event;
+    const entity = ctx.body.payload?.payment?.entity;
+    if ((event === 'payment.captured' || event === 'order.paid') && entity?.order_id) {
+      markPaid(entity.order_id, entity.id);
+    }
+    return { ok: true };
   });
 
   route('PUT', '/api/ads/:id/favorite', (ctx) => {
@@ -681,7 +829,7 @@ export function createApp(opts) {
   route('POST', '/api/chats', (ctx) => {
     const me = requireUser(ctx);
     const ad = adById(str(ctx.body.adId, 'adId', { max: 64 }));
-    if (!ad || ad.status === 'draft') throw new HttpError(404, 'Ad not found');
+    if (!ad || (ad.status !== 'active' && ad.status !== 'sold')) throw new HttpError(404, 'Ad not found');
     if (ad.seller_id === me.id) throw bad("You can't message yourself about your own ad");
     if (isBlocked(me.id, ad.seller_id)) throw new HttpError(403, 'You can no longer message this seller');
     let chat = q('SELECT * FROM chats WHERE ad_id = ? AND buyer_id = ?').get(ad.id, me.id);
@@ -758,6 +906,128 @@ export function createApp(opts) {
     const reason = str(ctx.body.reason, 'reason', { min: 3, max: 200 });
     q(`INSERT INTO reports (id, reporter_id, target_type, target_id, reason, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`).run(newId('rp'), me.id, targetType, targetId, reason, now());
+    if (targetType === 'ad') {
+      const ad = adById(targetId);
+      const { n } = q(`SELECT COUNT(DISTINCT reporter_id) AS n FROM reports
+        WHERE target_type = 'ad' AND target_id = ? AND status = 'open'`).get(targetId);
+      if (ad?.status === 'active' && n >= AUTO_REVIEW_REPORTS) {
+        q("UPDATE ads SET status = 'pending', updated_at = ? WHERE id = ?").run(now(), ad.id);
+        notify(ad.seller_id, 'system', 'Your ad is under review',
+          `“${ad.title}” was reported by several people and is hidden while our team checks it.`, '/myads');
+      }
+    }
+    return { ok: true };
+  });
+
+  /* ---- moderation (admins only) ---- */
+
+  function reportTarget(r) {
+    if (r.target_type === 'ad') {
+      const ad = adById(r.target_id);
+      if (!ad) return { kind: 'ad', missing: true };
+      const seller = userById(ad.seller_id);
+      return { kind: 'ad', ad: adOut(ad), seller: seller ? { ...sellerOut(seller), banned: !!seller.banned } : null };
+    }
+    const u = userById(r.target_id);
+    return u ? { kind: 'seller', seller: { ...sellerOut(u), banned: !!u.banned } } : { kind: 'seller', missing: true };
+  }
+
+  route('GET', '/api/admin/stats', (ctx) => {
+    requireAdmin(ctx);
+    const one = (sql) => Object.values(q(sql).get())[0];
+    return {
+      users: one('SELECT COUNT(*) FROM users WHERE is_demo = 0'),
+      liveAds: one("SELECT COUNT(*) FROM ads WHERE status = 'active'"),
+      underReview: one("SELECT COUNT(*) FROM ads WHERE status = 'pending'"),
+      openReports: one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
+      banned: one('SELECT COUNT(*) FROM users WHERE banned = 1'),
+      revenuePaise: one("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'paid'"),
+    };
+  });
+
+  route('GET', '/api/admin/reports', (ctx) => {
+    requireAdmin(ctx);
+    const status = ctx.query.get('status') === 'resolved' ? 'resolved' : 'open';
+    const rows = q(
+      status === 'open'
+        ? "SELECT * FROM reports WHERE status = 'open' ORDER BY created_at DESC LIMIT 200"
+        : "SELECT * FROM reports WHERE status != 'open' ORDER BY resolved_at DESC LIMIT 200",
+    ).all();
+    return {
+      reports: rows.map((r) => {
+        const reporter = userById(r.reporter_id);
+        const { n } = q(`SELECT COUNT(DISTINCT reporter_id) AS n FROM reports
+          WHERE target_type = ? AND target_id = ? AND status = 'open'`).get(r.target_type, r.target_id);
+        return {
+          id: r.id,
+          targetType: r.target_type,
+          targetId: r.target_id,
+          reason: r.reason,
+          createdAt: r.created_at,
+          status: r.status,
+          resolution: r.resolution,
+          resolvedAt: r.resolved_at,
+          reporterName: reporter?.name || 'Bazaar user',
+          openReportsOnTarget: n,
+          target: reportTarget(r),
+        };
+      }),
+    };
+  });
+
+  route('POST', '/api/admin/reports/:id/resolve', (ctx) => {
+    const admin = requireAdmin(ctx);
+    const report = q('SELECT * FROM reports WHERE id = ?').get(ctx.params.id);
+    if (!report) throw new HttpError(404, 'Report not found');
+    const action = oneOf(ctx.body.action, RESOLVE_ACTIONS, 'action');
+    const ad = report.target_type === 'ad' ? adById(report.target_id) : null;
+    const userId = report.target_type === 'seller' ? report.target_id : ad?.seller_id;
+
+    const close = (where, args, resolution) =>
+      q(`UPDATE reports SET status = 'resolved', resolution = ?, resolved_at = ?, resolved_by = ?
+         WHERE status = 'open' AND ${where}`).run(resolution, now(), admin.id, ...args);
+
+    tx(db, () => {
+      if (action === 'dismiss') {
+        q(`UPDATE reports SET status = 'resolved', resolution = 'dismissed', resolved_at = ?, resolved_by = ?
+           WHERE id = ?`).run(now(), admin.id, report.id);
+        // Nothing else pending on a hidden ad → put it back.
+        if (ad?.status === 'pending') {
+          const { n } = q(`SELECT COUNT(*) AS n FROM reports
+            WHERE target_type = 'ad' AND target_id = ? AND status = 'open'`).get(ad.id);
+          if (!n) q("UPDATE ads SET status = 'active' WHERE id = ?").run(ad.id);
+        }
+      } else if (action === 'restore') {
+        if (!ad) throw bad('Only ads can be restored');
+        q("UPDATE ads SET status = 'active' WHERE id = ?").run(ad.id);
+        close("target_type = 'ad' AND target_id = ?", [ad.id], 'restored');
+        notify(ad.seller_id, 'system', 'Your ad is live again', `“${ad.title}” passed review.`, `/ad/${ad.id}`);
+      } else if (action === 'remove') {
+        if (!ad) throw bad('This report is not about an ad — ban the seller instead');
+        q("UPDATE ads SET status = 'removed', boosted = 0, featured = 0 WHERE id = ?").run(ad.id);
+        close("target_type = 'ad' AND target_id = ?", [ad.id], 'removed');
+        notify(ad.seller_id, 'system', 'Your ad was removed',
+          `“${ad.title}” broke Bazaar's posting rules and was taken down.`, '/myads');
+      } else if (action === 'ban') {
+        if (!userId) throw bad('Seller not found');
+        const target = userById(userId);
+        if (target?.role === 'admin') throw bad("Admins can't be banned here");
+        q('UPDATE users SET banned = 1 WHERE id = ?').run(userId);
+        q('DELETE FROM sessions WHERE user_id = ?').run(userId);
+        q("UPDATE ads SET status = 'removed', boosted = 0, featured = 0 WHERE seller_id = ? AND status != 'removed'").run(userId);
+        close("target_type = 'seller' AND target_id = ?", [userId], 'banned');
+        close("target_type = 'ad' AND target_id IN (SELECT id FROM ads WHERE seller_id = ?)", [userId], 'banned');
+        for (const res of streams.get(userId) ?? []) res.end();
+      }
+    });
+    return { ok: true, target: reportTarget(report) };
+  });
+
+  route('POST', '/api/admin/users/:id/unban', (ctx) => {
+    requireAdmin(ctx);
+    const u = userById(ctx.params.id);
+    if (!u) throw new HttpError(404, 'User not found');
+    q('UPDATE users SET banned = 0 WHERE id = ?').run(u.id);
     return { ok: true };
   });
 
@@ -821,10 +1091,11 @@ export function createApp(opts) {
         chunks.push(c);
       });
       req.on('end', () => {
-        if (!chunks.length) return resolveBody({});
+        if (!chunks.length) return resolveBody({ body: {}, raw: '' });
+        const raw = Buffer.concat(chunks).toString('utf8');
         try {
-          const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-          resolveBody(parsed && typeof parsed === 'object' ? parsed : {});
+          const parsed = JSON.parse(raw);
+          resolveBody({ body: parsed && typeof parsed === 'object' ? parsed : {}, raw });
         } catch {
           reject(bad('Body must be valid JSON'));
         }
@@ -847,6 +1118,35 @@ export function createApp(opts) {
     res.end(readFileSync(file));
   }
 
+  /**
+   * GET /api/stream?token=… — server-sent events. Browsers' EventSource can't send headers,
+   * so the session token comes in the query. Emits `update` whenever something new arrives
+   * for the user; the app then fetches /api/updates.
+   */
+  function openStream(req, res, url) {
+    const user = userForToken(url.searchParams.get('token') ?? '');
+    if (!user) return send(res, 401, { error: 'Sign in to continue' });
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-store',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`retry: 3000\nevent: ready\ndata: {}\n\n`);
+    const set = streams.get(user.id) ?? new Set();
+    set.add(res);
+    streams.set(user.id, set);
+    const ping = setInterval(() => res.write(': ping\n\n'), STREAM_PING_MS);
+    ping.unref?.();
+    const done = () => {
+      clearInterval(ping);
+      set.delete(res);
+      if (!set.size) streams.delete(user.id);
+    };
+    req.on('close', done);
+    res.on('close', done);
+  }
+
   async function handle(req, res) {
     cors(req, res);
     if (req.method === 'OPTIONS') {
@@ -856,6 +1156,7 @@ export function createApp(opts) {
     const url = new URL(req.url ?? '/', 'http://local');
     if (req.method === 'GET' && url.pathname.startsWith('/uploads/'))
       return serveUpload(res, url.pathname.slice('/uploads/'.length));
+    if (req.method === 'GET' && url.pathname === '/api/stream') return openStream(req, res, url);
 
     const pathMatches = routes.filter((r) => r.re.test(url.pathname));
     const r = pathMatches.find((x) => x.method === req.method);
@@ -867,8 +1168,10 @@ export function createApp(opts) {
     try {
       const m = r.re.exec(url.pathname);
       const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
-      const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : {};
-      const ctx = { req, params, query: url.searchParams, body, user: authUser(req) };
+      const { body, raw } = ['POST', 'PUT', 'PATCH'].includes(req.method)
+        ? await readBody(req)
+        : { body: {}, raw: '' };
+      const ctx = { req, params, query: url.searchParams, body, raw, user: authUser(req) };
       const data = await r.handler(ctx);
       send(res, 200, data);
     } catch (err) {
@@ -881,6 +1184,8 @@ export function createApp(opts) {
   handle.close = () => {
     for (const t of timers) clearTimeout(t);
     timers.clear();
+    for (const set of streams.values()) for (const res of set) res.end();
+    streams.clear();
   };
   return handle;
 }

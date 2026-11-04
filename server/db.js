@@ -141,9 +141,48 @@ export function openDb(path = ':memory:', { seed = true, now = Date.now } = {}) 
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;');
   db.exec(SCHEMA);
+  migrate(db);
   const { n } = db.prepare('SELECT COUNT(*) AS n FROM users').get();
   if (seed && n === 0) seedDemo(db, now());
   return db;
+}
+
+/**
+ * Additive migrations for databases created by earlier versions.
+ * Each step is idempotent: columns are only added when missing.
+ */
+function migrate(db) {
+  const has = (table, col) =>
+    db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+  const add = (table, col, def) => {
+    if (!has(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  };
+  if (!has('ads', 'boosted_until')) {
+    add('ads', 'boosted_until', 'INTEGER');
+    // Boosts bought before expiry existed run for 7 days from their last update.
+    db.exec('UPDATE ads SET boosted_until = updated_at + 604800000 WHERE boosted = 1');
+  }
+  add('users', 'role', "TEXT NOT NULL DEFAULT 'user'");
+  add('users', 'banned', 'INTEGER NOT NULL DEFAULT 0');
+  add('reports', 'status', "TEXT NOT NULL DEFAULT 'open'");
+  add('reports', 'resolution', 'TEXT');
+  add('reports', 'resolved_at', 'INTEGER');
+  add('reports', 'resolved_by', 'TEXT');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payments (
+      order_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ad_id TEXT NOT NULL,
+      purpose TEXT NOT NULL DEFAULT 'boost',
+      amount INTEGER NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'INR',
+      status TEXT NOT NULL DEFAULT 'created',
+      payment_id TEXT,
+      created_at INTEGER NOT NULL,
+      paid_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS reports_target ON reports(target_type, target_id, status);
+  `);
 }
 
 /** Runs fn inside a transaction, rolling back if it throws. */
@@ -185,8 +224,8 @@ function seedDemo(db, now) {
     const insAd = db.prepare(`INSERT INTO ads
       (id, seller_id, title, description, price, category, condition, images, area, city,
        distance_km, views, saves, featured, boosted, negotiable, delivery, status, attributes,
-       warranty, price_history, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+       warranty, price_history, created_at, updated_at, boosted_until)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const a of seed.ads) {
       const created = now - a.ageMs;
       insAd.run(
@@ -215,6 +254,7 @@ function seedDemo(db, now) {
           : null,
         created,
         created,
+        a.boosted ? now + 7 * 86_400_000 : null,
       );
     }
     const insReview = db.prepare(`INSERT INTO reviews
