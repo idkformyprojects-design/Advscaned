@@ -1,0 +1,573 @@
+{
+  "sellers": [
+    {
+      "id": "u1",
+      "name": "Rohan Mehta",
+      "phone": "+91 98300 11221",
+      "avatarColor": "#0AA98C",
+      "rating": 4.8,
+      "reviews": 34,
+      "joined": "2021",
+      "verified": true,
+      "responseRate": 96,
+      "responseTime": "within 10 mins",
+      "bio": "Car enthusiast. All my cars are single-owner with full service history."
+    },
+    {
+      "id": "u2",
+      "name": "Priya Nair",
+      "phone": "+91 98311 44556",
+      "avatarColor": "#8B5CF6",
+      "rating": 4.9,
+      "reviews": 61,
+      "joined": "2019",
+      "verified": true,
+      "responseRate": 98,
+      "responseTime": "within 5 mins",
+      "bio": "Selling gently-used gadgets after upgrading. Box + bill for everything."
+    },
+    {
+      "id": "u3",
+      "name": "Ankit Sharma",
+      "phone": "+91 99030 77889",
+      "avatarColor": "#F59E0B",
+      "rating": 4.5,
+      "reviews": 12,
+      "joined": "2023",
+      "verified": true,
+      "responseRate": 88,
+      "responseTime": "within an hour"
+    },
+    {
+      "id": "u4",
+      "name": "Meera Iyer",
+      "phone": "+91 90070 22558",
+      "avatarColor": "#DB2777",
+      "rating": 4.7,
+      "reviews": 27,
+      "joined": "2020",
+      "verified": true,
+      "responseRate": 92,
+      "responseTime": "within 30 mins",
+      "bio": "Interior stylist. Furniture from my staging projects, barely used."
+    },
+    {
+      "id": "u5",
+      "name": "Sandeep Ghosh",
+      "phone": "+91 98361 90876",
+      "avatarColor": "#2563EB",
+      "rating": 4.4,
+      "reviews": 9,
+      "joined": "2022",
+      "verified": false,
+      "responseRate": 79,
+      "responseTime": "within a day"
+    }
+  ],
+  "ads": [
+    {
+      "id": "ad-1",
+      "title": "Honda City VX CVT · 2019 · Single owner",
+      "description": "2019 Honda City VX CVT in excellent condition. Single owner, full service history at Honda authorised workshop. New Michelin tyres (Oct 2025), zero accidents, all original paint. Sunroof, reverse camera, Apple CarPlay. Insurance valid till Aug 2026. Price slightly negotiable for serious buyers.",
+      "price": 785000,
+      "category": "cars",
+      "condition": "good",
+      "images": [
+        "/images/car-city.jpg",
+        "/images/car-city-interior.jpg"
+      ],
+      "area": "Salt Lake",
+      "city": "Kolkata",
+      "distanceKm": 2.4,
+      "sellerId": "u1",
+      "views": 1284,
+      "saves": 96,
+      "featured": true,
+      "negotiable": true,
+      "status": "active",
+      "warranty": "No",
+      "attributes": {
+        "brand": "Honda",
+        "year": "2019",
+        "fuel": "Petrol",
+        "transmission": "Automatic",
+        "km": "42,000",
+        "owners": "1st"
+      },
+      "ageMs": 10800004
+    },
+    {
+      "id": "ad-2",
+      "title": "Maruti Swift VXi · 2021 · 28,400 km",
+      "description": "Swift VXi 2021, driven only 28,400 km. Second owner, all documents clear, insurance till Mar 2026. Company-fitted music system and reverse sensors. Small scratch on rear bumper (pictured in person). Genuine buyers only.",
+      "price": 540000,
+      "category": "cars",
+      "condition": "good",
+      "images": [
+        "/images/car-swift.jpg"
+      ],
+      "area": "New Town",
+      "city": "Kolkata",
+      "distanceKm": 7.9,
+      "sellerId": "u3",
+      "views": 742,
+      "saves": 41,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Maruti Suzuki",
+        "year": "2021",
+        "fuel": "Petrol",
+        "transmission": "Manual",
+        "km": "28,400",
+        "owners": "2nd"
+      },
+      "ageMs": 32400004
+    },
+    {
+      "id": "ad-3",
+      "title": "iPhone 13 · 128 GB · Battery 89% · Boxed",
+      "description": "iPhone 13 128GB in Midnight. Battery health 89%, screen and back are flawless (always used with case + tempered glass). Comes with original box, cable and a spare 20W charger. No warranty left, but I can demo Face ID and full diagnostics before you pay.",
+      "price": 34500,
+      "category": "mobiles",
+      "condition": "like-new",
+      "images": [
+        "/images/phone-iphone.jpg",
+        "/images/iphone-back.jpg"
+      ],
+      "area": "Ballygunge",
+      "city": "Kolkata",
+      "distanceKm": 4.1,
+      "sellerId": "u2",
+      "views": 2310,
+      "saves": 214,
+      "featured": true,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Apple",
+        "storage": "128 GB",
+        "ram": "4 GB",
+        "battery": "89%",
+        "accessories": "Yes"
+      },
+      "ageMs": 3600004
+    },
+    {
+      "id": "ad-4",
+      "title": "Samsung Galaxy S21 FE 5G · 8/128 GB",
+      "description": "Galaxy S21 FE 5G, Snapdragon 888, 8GB/128GB. Bought Jan 2024, shows minimal signs of use. Comes with a silicone case and the original box. Battery is healthy, no heating issues. Selling because I upgraded.",
+      "price": 19900,
+      "category": "mobiles",
+      "condition": "good",
+      "images": [
+        "/images/phone-samsung.jpg"
+      ],
+      "area": "Garia",
+      "city": "Kolkata",
+      "distanceKm": 11.2,
+      "sellerId": "u3",
+      "views": 908,
+      "saves": 63,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Samsung",
+        "storage": "128 GB",
+        "ram": "8 GB",
+        "battery": "94%",
+        "accessories": "Yes"
+      },
+      "ageMs": 79200004
+    },
+    {
+      "id": "ad-5",
+      "title": "MacBook Air M1 · 8/256 GB · 142 cycles",
+      "description": "MacBook Air M1 (2020), 8GB RAM / 256GB SSD, only 142 battery cycles. Space grey, no dents or scratches — used for light design work. Comes with original 30W charger and box. Perfect for students and developers.",
+      "price": 52000,
+      "category": "electronics",
+      "condition": "like-new",
+      "images": [
+        "/images/laptop-macbook.jpg",
+        "/images/macbook-detail.jpg"
+      ],
+      "area": "Park Street",
+      "city": "Kolkata",
+      "distanceKm": 5.6,
+      "sellerId": "u2",
+      "views": 1534,
+      "saves": 178,
+      "featured": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Apple",
+        "model": "MacBook Air M1",
+        "warranty": "None"
+      },
+      "ageMs": 18000004,
+      "priceHistory": [
+        {
+          "price": 59000,
+          "ageMs": 1036800004
+        },
+        {
+          "price": 55000,
+          "ageMs": 432000004
+        },
+        {
+          "price": 52000,
+          "ageMs": 86400004
+        }
+      ]
+    },
+    {
+      "id": "ad-6",
+      "title": "3-seater fabric sofa · Scandinavian beige",
+      "description": "Solid wood frame 3-seater sofa in oatmeal beige fabric, bought from a staging project. Used for 4 months only, professionally cleaned. Cushions are firm, no stains or tears. Pickup from Behala — can arrange delivery within Kolkata for ₹700.",
+      "price": 18500,
+      "category": "furniture",
+      "condition": "like-new",
+      "images": [
+        "/images/sofa-beige.jpg",
+        "/images/sofa-detail.jpg"
+      ],
+      "area": "Behala",
+      "city": "Kolkata",
+      "distanceKm": 9.8,
+      "sellerId": "u4",
+      "views": 612,
+      "saves": 58,
+      "negotiable": true,
+      "delivery": true,
+      "status": "active",
+      "attributes": {
+        "type": "Sofa",
+        "material": "Upholstered"
+      },
+      "ageMs": 50400004,
+      "priceHistory": [
+        {
+          "price": 21000,
+          "ageMs": 1382400004
+        },
+        {
+          "price": 18500,
+          "ageMs": 259200004
+        }
+      ]
+    },
+    {
+      "id": "ad-7",
+      "title": "2 BHK semi-furnished flat · New Town · 950 sqft",
+      "description": "Spacious 2 BHK on the 6th floor with open balcony facing the park. Semi-furnished with modular kitchen, wardrobes and 2 ACs. Gated complex with 24x7 security, gym, covered parking and lift. Family preferred. Deposit 2 months, 11-month agreement.",
+      "price": 28000,
+      "category": "properties",
+      "condition": "good",
+      "images": [
+        "/images/apartment-living.jpg",
+        "/images/apartment-bedroom.jpg"
+      ],
+      "area": "New Town",
+      "city": "Kolkata",
+      "distanceKm": 8.6,
+      "sellerId": "u5",
+      "views": 1890,
+      "saves": 240,
+      "featured": true,
+      "status": "active",
+      "attributes": {
+        "listingType": "For rent",
+        "bhk": "2 BHK",
+        "bathrooms": "2",
+        "furnishing": "Semi-furnished",
+        "area": "950",
+        "floor": "6 of 11"
+      },
+      "ageMs": 108000004
+    },
+    {
+      "id": "ad-8",
+      "title": "Royal Enfield Bullet 350 · 2020 · Matte black",
+      "description": "Bullet 350 BS6, matte black, 2020 registration. 18,600 km on the odometer, recently serviced with new chain sprocket and battery. Papers up to date, transfer support provided. Two helmets included.",
+      "price": 118000,
+      "category": "bikes",
+      "condition": "good",
+      "images": [
+        "/images/bike-royal-enfield.jpg"
+      ],
+      "area": "Howrah",
+      "city": "Kolkata",
+      "distanceKm": 12.4,
+      "sellerId": "u1",
+      "views": 1032,
+      "saves": 88,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Royal Enfield",
+        "year": "2020",
+        "km": "18,600",
+        "owners": "1st"
+      },
+      "ageMs": 172800004
+    },
+    {
+      "id": "ad-9",
+      "title": "Sheesham wood 6-seater dining set",
+      "description": "Handcrafted sheesham wood dining table with 6 cushioned chairs. Bought for ₹42,000 two years ago, moving out so selling at a loss. Minor polish marks on one chair leg, otherwise excellent. Pickup only from Salt Lake.",
+      "price": 24000,
+      "category": "furniture",
+      "condition": "good",
+      "images": [
+        "/images/dining-table.jpg"
+      ],
+      "area": "Salt Lake",
+      "city": "Kolkata",
+      "distanceKm": 2.1,
+      "sellerId": "u4",
+      "views": 421,
+      "saves": 27,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "type": "Dining set",
+        "material": "Sheesham"
+      },
+      "ageMs": 194400004
+    },
+    {
+      "id": "ad-10",
+      "title": "PlayStation 5 Disc Edition + 2 controllers",
+      "description": "PS5 disc edition (Indian unit) with 2 DualSense controllers and all original cables. Barely used — mostly streaming. Includes 3 games: FC 25, Spider-Man 2 and Gran Turismo 7. Bill available, warranty till Dec 2026.",
+      "price": 38000,
+      "category": "electronics",
+      "condition": "like-new",
+      "images": [
+        "/images/console-ps5.jpg",
+        "/images/ps5-controllers.jpg"
+      ],
+      "area": "Lake Town",
+      "city": "Kolkata",
+      "distanceKm": 6.3,
+      "sellerId": "u3",
+      "views": 1176,
+      "saves": 132,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Sony",
+        "model": "PlayStation 5 Slim",
+        "warranty": "Under 3 months"
+      },
+      "ageMs": 25200004,
+      "priceHistory": [
+        {
+          "price": 42500,
+          "ageMs": 777600004
+        },
+        {
+          "price": 38000,
+          "ageMs": 172800004
+        }
+      ]
+    },
+    {
+      "id": "ad-11",
+      "title": "Double-door refrigerator · 320 L · 2022",
+      "description": "Samsung 320L double-door refrigerator, frost-free, 2022 model. Cooling is perfect, no dents. Shifting to a furnished flat so selling. Original bill and user manual included.",
+      "price": 16500,
+      "category": "electronics",
+      "condition": "good",
+      "images": [
+        "/images/fridge-lg.jpg"
+      ],
+      "area": "Dum Dum",
+      "city": "Kolkata",
+      "distanceKm": 10.7,
+      "sellerId": "u5",
+      "views": 388,
+      "saves": 19,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Samsung",
+        "model": "RT34 320L",
+        "warranty": "None"
+      },
+      "ageMs": 93600004
+    },
+    {
+      "id": "ad-12",
+      "title": "Canon EOS 200D II + 50mm prime lens",
+      "description": "Canon 200D Mark II with kit lens plus a 50mm f/1.8 prime. Shutter count ~9,400. Includes camera bag, 64GB card, extra battery and charger. Great starter kit for portraits and vlogs.",
+      "price": 31500,
+      "category": "electronics",
+      "condition": "good",
+      "images": [
+        "/images/camera-canon.jpg"
+      ],
+      "area": "Gariahat",
+      "city": "Kolkata",
+      "distanceKm": 4.7,
+      "sellerId": "u2",
+      "views": 546,
+      "saves": 44,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "brand": "Canon",
+        "model": "EOS 200D II",
+        "warranty": "None"
+      },
+      "ageMs": 259200004
+    },
+    {
+      "id": "ad-13",
+      "title": "Golden Retriever puppies · 8 weeks · vaccinated",
+      "description": "Healthy Golden Retriever puppies, 8 weeks old, first vaccination and deworming done. Mother is our family pet — you can meet her. Home-raised, playful and socialised. Only to loving families, no breeders please.",
+      "price": 22000,
+      "category": "pets",
+      "condition": "new",
+      "images": [
+        "/images/puppy-golden.jpg"
+      ],
+      "area": "Rajarhat",
+      "city": "Kolkata",
+      "distanceKm": 9.1,
+      "sellerId": "u2",
+      "views": 2045,
+      "saves": 190,
+      "status": "active",
+      "attributes": {
+        "species": "Dog",
+        "breed": "Golden Retriever",
+        "age": "2 months",
+        "vaccinated": "Yes"
+      },
+      "ageMs": 39600004
+    },
+    {
+      "id": "ad-14",
+      "title": "Giant Talon mountain bike · 27.5T · serviced",
+      "description": "Giant Talon 27.5T with hydraulic disc brakes and Shimano 21-speed gearing. Recently serviced — new brake pads and tuned derailleurs. Ideal for city rides and weekend trails.",
+      "price": 21500,
+      "category": "sports",
+      "condition": "good",
+      "images": [
+        "/images/cycle-giant.jpg"
+      ],
+      "area": "Jadavpur",
+      "city": "Kolkata",
+      "distanceKm": 8.2,
+      "sellerId": "u3",
+      "views": 302,
+      "saves": 21,
+      "negotiable": true,
+      "status": "active",
+      "attributes": {
+        "type": "Bicycle",
+        "brand": "Giant"
+      },
+      "ageMs": 72000004
+    },
+    {
+      "id": "ad-15",
+      "title": "Frontend developer (React) · 2–5 yrs · Hybrid",
+      "description": "We are hiring a React developer for our Salt Lake office (3 days WFH). You will build customer-facing dashboards used by 40k+ merchants. Stack: React, TypeScript, Tailwind, REST. Perks: health cover, learning budget, year-end bonus.",
+      "price": 1200000,
+      "category": "jobs",
+      "condition": "new",
+      "images": [],
+      "area": "Salt Lake",
+      "city": "Kolkata",
+      "distanceKm": 2.9,
+      "sellerId": "u5",
+      "views": 864,
+      "saves": 57,
+      "status": "active",
+      "attributes": {
+        "jobType": "Full-time",
+        "company": "Nexus Labs",
+        "experience": "2–5 years"
+      },
+      "ageMs": 21600004
+    },
+    {
+      "id": "ad-16",
+      "title": "AC service & repair · all brands · same-day",
+      "description": "Certified technicians for split and window AC servicing across Kolkata. Deep cleaning from ₹499, gas top-up from ₹1,800. 90-day service warranty, GST bill provided. Book a slot and we reach you the same day.",
+      "price": 499,
+      "category": "services",
+      "condition": "new",
+      "images": [],
+      "area": "Bhowanipore",
+      "city": "Kolkata",
+      "distanceKm": 5.2,
+      "sellerId": "u1",
+      "views": 233,
+      "saves": 12,
+      "status": "active",
+      "attributes": {
+        "serviceType": "Home repair",
+        "availability": "Anytime"
+      },
+      "ageMs": 345600004
+    }
+  ],
+  "reviews": [
+    {
+      "id": "rv1",
+      "sellerId": "u1",
+      "authorId": "x1",
+      "authorName": "Nikhil Bose",
+      "rating": 5,
+      "text": "Bought the City from Rohan. He had every service record ready and let me take it to my mechanic first. Zero pressure, honest about a small scratch. Would buy again.",
+      "ageMs": 518400004
+    },
+    {
+      "id": "rv2",
+      "sellerId": "u1",
+      "authorId": "x2",
+      "authorName": "Sneha Dutta",
+      "rating": 4,
+      "text": "Smooth handover and he even helped with the RC transfer paperwork. Replied a bit slowly on the weekend.",
+      "ageMs": 1641600004
+    },
+    {
+      "id": "rv3",
+      "sellerId": "u2",
+      "authorId": "x3",
+      "authorName": "Arjun Sen",
+      "rating": 5,
+      "text": "The iPhone was exactly as described — battery health matched, box and cable included. Priya even waited while I tested Face ID.",
+      "ageMs": 172800004
+    },
+    {
+      "id": "rv4",
+      "sellerId": "u2",
+      "authorId": "x4",
+      "authorName": "Farhan Q.",
+      "rating": 5,
+      "text": "Second purchase from Priya. Always well-kept gadgets and fair prices. Highly recommended.",
+      "ageMs": 950400004
+    },
+    {
+      "id": "rv5",
+      "sellerId": "u3",
+      "authorId": "x5",
+      "authorName": "Ritika M.",
+      "rating": 4,
+      "text": "Good condition PS5, came with the games as promised. Meeting point was a bit far for me.",
+      "ageMs": 691200004
+    },
+    {
+      "id": "rv6",
+      "sellerId": "u4",
+      "authorId": "x6",
+      "authorName": "Debjit R.",
+      "rating": 5,
+      "text": "Sofa looked even better in person. Meera arranged delivery the same evening for a small fee. Very professional.",
+      "ageMs": 345600004
+    }
+  ]
+}

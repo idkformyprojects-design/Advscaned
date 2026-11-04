@@ -19,3 +19,6 @@ bazaar-marketplace.zip
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Backend database and uploaded photos (created at runtime)
+server/data

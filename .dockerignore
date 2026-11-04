@@ -1,0 +1,9 @@
+node_modules
+dist
+android
+public
+src
+scripts
+server/data
+.git
+.tmp

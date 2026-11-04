@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Bazaar — a modern OLX-class classifieds marketplace PWA (React + TypeScript + Tailwind + Zustand).",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -15,8 +18,14 @@
     "smoke": "npm run test:bundle && node scripts/smoke.mjs",
     "icons": "node scripts/make-icons.mjs",
     "flows": "npm run test:bundle && node scripts/flows.mjs",
-    "verify": "npm run typecheck && npm run smoke && npm run flows && npm run build",
-    "test:bundle": "esbuild src/main.tsx --bundle --outfile=.tmp/smoke.mjs --format=esm --define:process.env.NODE_ENV='\"development\"' --loader:.css=empty --log-level=error"
+    "verify": "npm run typecheck && npm run smoke && npm run flows && npm run server:test && npm run test:sync && npm run build",
+    "test:bundle": "esbuild src/main.tsx --bundle --outfile=.tmp/smoke.mjs --format=esm --define:process.env.NODE_ENV='\"development\"' --loader:.css=empty --log-level=error",
+    "server": "node --no-warnings server/index.js",
+    "server:dev": "node --no-warnings --watch server/index.js",
+    "server:test": "node --no-warnings --test server/test/*.test.js",
+    "server:seed-json": "node --no-warnings scripts/export-seed.mjs",
+    "test:sync": "node --no-warnings scripts/sync-e2e.mjs",
+    "keystore": "bash scripts/make-keystore.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",

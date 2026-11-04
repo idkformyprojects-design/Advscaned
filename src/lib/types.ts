@@ -129,6 +129,8 @@ export interface SessionUser {
   area: string;
   avatarColor: string;
   joined: number;
+  /** Account id on the Bazaar API when signed in against a backend. */
+  remoteId?: string;
 }
 
 export const CATEGORY_ATTRS: Record<

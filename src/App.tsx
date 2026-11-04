@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useStore } from './lib/store';
+import { startSync } from './lib/sync';
 import Home from './pages/Home';
 import SearchPage from './pages/SearchPage';
 import AdDetail from './pages/AdDetail';
@@ -28,6 +29,9 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 export default function App() {
   const theme = useStore((s) => s.theme);
+
+  // Connect to the backend when the app was built with VITE_API_URL.
+  useEffect(() => startSync(), []);
 
   useEffect(() => {
     const root = document.documentElement;

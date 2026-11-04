@@ -1,0 +1,28 @@
+# One-click backend on Render: New → Blueprint → pick this repo.
+# The persistent disk keeps the database and photos across deploys (needs a paid instance).
+services:
+  - type: web
+    name: bazaar-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    disk:
+      name: bazaar-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: OTP_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      # Pick one way to send login codes:
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      # For a demo without SMS, set OTP_DEV_CODE=1234 instead (everyone's code is 1234).
+      - key: OTP_DEV_CODE
+        sync: false

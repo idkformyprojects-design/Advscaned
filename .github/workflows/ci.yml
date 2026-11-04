@@ -34,7 +34,15 @@ jobs:
       - name: Interaction flows
         run: npm run flows
 
+      - name: API tests
+        run: npm run server:test
+
+      - name: App ↔ API sync test
+        run: npm run test:sync
+
       - name: Production build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
       - name: Upload web build
@@ -78,6 +86,8 @@ jobs:
         run: npm ci
 
       - name: Build web bundle
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
       - name: Sync Capacitor project

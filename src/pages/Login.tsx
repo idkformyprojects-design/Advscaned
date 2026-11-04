@@ -11,6 +11,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
+import { api, apiEnabled, ApiError, setToken, type RemoteMe } from '../lib/api';
+import { completeSignIn } from '../lib/sync';
 import { AREAS } from '../lib/data';
 import { cn, vibrate } from '../lib/utils';
 import { Logo } from '../components/AppShell';
@@ -33,6 +35,8 @@ export default function Login() {
   const [seconds, setSeconds] = useState(24);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [session, setSession] = useState<{ token: string; user: RemoteMe } | null>(null);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -46,13 +50,31 @@ export default function Login() {
     return () => window.clearInterval(t);
   }, [step]);
 
-  const sendOtp = () => {
+  const errorText = (e: unknown) =>
+    e instanceof ApiError ? e.message : 'Something went wrong — please try again';
+
+  const sendOtp = async () => {
     if (!/^\d{10}$/.test(phone)) {
       setError('Enter a 10-digit mobile number');
       return;
     }
     setError('');
     setBusy(true);
+    if (apiEnabled) {
+      try {
+        const res = await api.requestOtp(phone);
+        setDevCode(res.devCode ?? null);
+        setOtp(['', '', '', '']);
+        setStep('otp');
+        vibrate(10);
+        window.setTimeout(() => refs.current[0]?.focus(), 120);
+      } catch (e) {
+        setError(errorText(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     window.setTimeout(() => {
       setBusy(false);
       setStep('otp');
@@ -61,21 +83,59 @@ export default function Login() {
     }, 700);
   };
 
-  const verify = (code = otp.join('')) => {
+  const verify = async (code = otp.join('')) => {
     if (code.length !== 4) {
       setError('Enter the 4-digit code');
       return;
     }
+    if (busy) return;
     setError('');
     setBusy(true);
+    if (apiEnabled) {
+      try {
+        const res = await api.verifyOtp(phone, code);
+        if (!res.isNew && res.user.name) {
+          // Returning user — straight in.
+          await completeSignIn(res.token, res.user);
+          vibrate(16);
+          navigate(from, { replace: true });
+          return;
+        }
+        setSession(res);
+        setName(res.user.name);
+        setStep('name');
+      } catch (e) {
+        setError(errorText(e));
+        setOtp(['', '', '', '']);
+        window.setTimeout(() => refs.current[0]?.focus(), 60);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     window.setTimeout(() => {
       setBusy(false);
       setStep('name');
     }, 600);
   };
 
-  const finish = () => {
+  const finish = async () => {
     const finalName = name.trim() || 'Bazaar User';
+    if (apiEnabled && session) {
+      setBusy(true);
+      try {
+        setToken(session.token);
+        const { user: me } = await api.updateMe({ name: finalName, area });
+        await completeSignIn(session.token, me);
+        vibrate(16);
+        navigate(from, { replace: true });
+      } catch (e) {
+        setError(errorText(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     login(finalName, `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`, area);
     vibrate(16);
     navigate(from, { replace: true });
@@ -145,7 +205,9 @@ export default function Login() {
                 {busy ? 'Sending…' : 'Continue'} <ArrowRight size={17} />
               </button>
               <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
-                Demo mode — no SMS is sent. Use any 10-digit number and code <b>1234</b>.
+                {apiEnabled
+                  ? "We'll text you a 4-digit code to confirm it's you."
+                  : <>Demo mode — no SMS is sent. Use any 10-digit number and code <b>1234</b>.</>}
               </p>
             </div>
           )}
@@ -169,6 +231,11 @@ export default function Login() {
                 ))}
               </div>
               {error && <p className="mt-1.5 text-[12px] font-medium text-rose-600">{error}</p>}
+              {devCode && (
+                <p className="mt-2 text-[11.5px] text-muted">
+                  Test server — your code is <b>{devCode}</b>
+                </p>
+              )}
               <button
                 onClick={() => verify()}
                 disabled={busy}
@@ -185,7 +252,10 @@ export default function Login() {
                 </button>
                 <button
                   disabled={seconds > 0}
-                  onClick={() => setSeconds(24)}
+                  onClick={() => {
+                    setSeconds(24);
+                    if (apiEnabled) void sendOtp();
+                  }}
                   className="font-semibold text-brand-600 disabled:text-muted"
                 >
                   {seconds > 0 ? `Resend in ${seconds}s` : 'Resend code'}
@@ -219,8 +289,9 @@ export default function Login() {
                   </option>
                 ))}
               </select>
-              <button onClick={finish} className="btn btn-primary mt-4 w-full py-3.5">
-                Start buying & selling <ArrowRight size={17} />
+              {error && <p className="mt-1.5 text-[12px] font-medium text-rose-600">{error}</p>}
+              <button onClick={finish} disabled={busy} className="btn btn-primary mt-4 w-full py-3.5">
+                {busy ? 'Setting up…' : 'Start buying & selling'} <ArrowRight size={17} />
               </button>
               <p className="mt-3 text-center text-[11px] text-muted">
                 By continuing you agree to our Terms of Use and Privacy Policy.

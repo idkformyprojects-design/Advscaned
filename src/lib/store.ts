@@ -10,6 +10,7 @@ import {
 import type { Ad, AppNotification, Chat, Message, Review, SavedSearch, SessionUser } from './types';
 import { sellerById } from './data';
 import { uid } from './utils';
+import { remote } from './sync';
 
 export type ToastKind = 'success' | 'error' | 'info';
 export interface Toast {
@@ -146,11 +147,17 @@ export const useStore = create<AppState>()(
           onboarded: true,
         })),
 
-      logout: () => set({ user: null }),
+      logout: () => {
+        set({ user: null });
+        remote.logout();
+      },
 
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
-      setArea: (area) => set({ area }),
+      setArea: (area) => {
+        set({ area });
+        if (get().user) remote.setArea(area);
+      },
       dismissInstalledHint: () => set({ installedHintDismissed: true }),
       completeOnboarding: () => set({ onboarded: true }),
 
@@ -162,6 +169,7 @@ export const useStore = create<AppState>()(
             a.id === id ? { ...a, saves: Math.max(0, a.saves + (has ? -1 : 1)) } : a,
           ),
         }));
+        remote.favorite(id, !has);
         return !has;
       },
       isFavorite: (id) => get().favorites.includes(id),
@@ -174,19 +182,37 @@ export const useStore = create<AppState>()(
           ].slice(0, 24),
         })),
 
-      incrementViews: (id) =>
+      incrementViews: (id) => {
         set((s) => ({
           ads: s.ads.map((a) => (a.id === id ? { ...a, views: a.views + 1 } : a)),
-        })),
+        }));
+        remote.view(id);
+      },
 
-      createAd: (ad) => set((s) => ({ ads: [ad, ...s.ads] })),
+      createAd: (ad) => {
+        set((s) => ({ ads: [ad, ...s.ads] }));
+        remote.createAd(ad);
+      },
 
-      updateAd: (id, patch) =>
-        set((s) => ({ ads: s.ads.map((a) => (a.id === id ? { ...a, ...patch } : a)) })),
+      updateAd: (id, patch) => {
+        set((s) => ({ ads: s.ads.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
+        remote.updateAd(id, patch);
+      },
 
-      deleteAd: (id) => set((s) => ({ ads: s.ads.filter((a) => a.id !== id) })),
+      deleteAd: (id) => {
+        set((s) => ({ ads: s.ads.filter((a) => a.id !== id) }));
+        remote.deleteAd(id);
+      },
 
-      boostAd: (id) =>
+      boostAd: (id) => {
+        if (remote.enabled) {
+          // The server records the boost and sends the notification.
+          set((s) => ({
+            ads: s.ads.map((a) => (a.id === id ? { ...a, boosted: true, featured: true } : a)),
+          }));
+          remote.boostAd(id);
+          return;
+        }
         set((s) => ({
           ads: s.ads.map((a) => (a.id === id ? { ...a, boosted: true, featured: true } : a)),
           notifications: [
@@ -201,9 +227,11 @@ export const useStore = create<AppState>()(
             },
             ...s.notifications,
           ],
-        })),
+        }));
+      },
 
-      dropPrice: (id, price) =>
+      dropPrice: (id, price) => {
+        const before = get().ads.find((a) => a.id === id)?.price;
         set((s) => {
           const ad = s.ads.find((a) => a.id === id);
           if (!ad || price >= ad.price) return s;
@@ -226,7 +254,9 @@ export const useStore = create<AppState>()(
               ...s.notifications,
             ],
           };
-        }),
+        });
+        if (before !== undefined && price < before) remote.dropPrice(id, price);
+      },
 
       startChat: (adId) => {
         const existing = get().chats.find((c) => c.adId === adId);
@@ -241,6 +271,7 @@ export const useStore = create<AppState>()(
           lastMessageAt: Date.now(),
         };
         set((s) => ({ chats: [chat, ...s.chats] }));
+        remote.startChat(chat.id, adId);
         return chat.id;
       },
 
@@ -262,7 +293,12 @@ export const useStore = create<AppState>()(
           ),
         }));
 
-        // Simulated seller presence — a real backend would push this over websockets.
+        if (remote.enabled) {
+          remote.sendMessage(chatId, msg);
+          return;
+        }
+
+        // Offline demo: simulated seller presence.
         const chat = get().chats.find((c) => c.id === chatId);
         if (!chat || get().blockedSellers.includes(chat.sellerId)) return;
         const delay = 1200 + Math.random() * 1400;
@@ -299,7 +335,9 @@ export const useStore = create<AppState>()(
         }, delay);
       },
 
-      markChatRead: (chatId) =>
+      markChatRead: (chatId) => {
+        const chat = get().chats.find((c) => c.id === chatId);
+        if (chat?.messages.some((m) => m.senderId !== 'me' && !m.read)) remote.markChatRead(chatId);
         set((s) => ({
           chats: s.chats.map((c) =>
             c.id === chatId
@@ -309,7 +347,8 @@ export const useStore = create<AppState>()(
                 }
               : c,
           ),
-        })),
+        }));
+      },
 
       unreadCount: () =>
         get().chats.reduce(
@@ -325,18 +364,25 @@ export const useStore = create<AppState>()(
           ],
         })),
 
-      markAllNotificationsRead: () =>
-        set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
+      markAllNotificationsRead: () => {
+        set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+        remote.markNotificationsRead();
+      },
 
-      markNotificationRead: (id) =>
+      markNotificationRead: (id) => {
         set((s) => ({
           notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-        })),
+        }));
+        remote.markNotificationsRead(id);
+      },
 
-      addReview: (review) =>
+      addReview: (review) => {
+        const id = uid('rv');
         set((s) => ({
-          reviews: [{ ...review, id: uid('rv'), createdAt: Date.now() }, ...s.reviews],
-        })),
+          reviews: [{ ...review, id, createdAt: Date.now() }, ...s.reviews],
+        }));
+        remote.addReview(id, review.sellerId, review.rating, review.text);
+      },
 
       addSavedSearch: (search) =>
         set((s) => ({
@@ -353,26 +399,37 @@ export const useStore = create<AppState>()(
           ),
         })),
 
-      blockSeller: (sellerId) =>
+      blockSeller: (sellerId) => {
         set((s) => ({
           blockedSellers: s.blockedSellers.includes(sellerId)
             ? s.blockedSellers
             : [...s.blockedSellers, sellerId],
           chats: s.chats.map((c) => (c.sellerId === sellerId ? { ...c, archived: true } : c)),
-        })),
+        }));
+        remote.setBlocked(sellerId, true);
+      },
 
-      unblockSeller: (sellerId) =>
+      unblockSeller: (sellerId) => {
         set((s) => ({
           blockedSellers: s.blockedSellers.filter((id) => id !== sellerId),
           chats: s.chats.map((c) => (c.sellerId === sellerId ? { ...c, archived: false } : c)),
-        })),
+        }));
+        remote.setBlocked(sellerId, false);
+      },
 
-      report: (targetType, targetId, reason) =>
+      report: (targetType, targetId, reason) => {
         set((s) => ({
           reports: [{ id: uid('rp'), targetType, targetId, reason, at: Date.now() }, ...s.reports],
-        })),
+        }));
+        remote.report(targetType, targetId, reason);
+      },
 
-      resetDemo: () =>
+      resetDemo: () => {
+        if (remote.enabled) {
+          // Live data belongs to the server — just reload it.
+          remote.resetDemo();
+          return;
+        }
         set({
           ads: SEED_ADS,
           chats: SEED_CHATS(),
@@ -383,7 +440,8 @@ export const useStore = create<AppState>()(
           recentlyViewed: [],
           blockedSellers: [],
           reports: [],
-        }),
+        });
+      },
     }),
     {
       name: 'bazaar-store-v1',

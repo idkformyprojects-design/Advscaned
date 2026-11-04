@@ -389,4 +389,26 @@ export const SELLERS: Seller[] = [
   },
 ];
 
-export const sellerById = (id: string) => SELLERS.find((s) => s.id === id) ?? SELLERS[0];
+/** Sellers loaded from the API (real accounts), consulted before the demo sellers. */
+const remoteSellers = new Map<string, Seller>();
+export function registerSellers(list: Seller[]) {
+  list.forEach((s) => remoteSellers.set(s.id, s));
+}
+
+const UNKNOWN_SELLER: Seller = {
+  id: 'unknown',
+  name: 'Bazaar user',
+  phone: '',
+  avatarColor: '#64748B',
+  rating: 0,
+  reviews: 0,
+  joined: String(new Date().getFullYear()),
+  verified: false,
+  responseRate: 0,
+  responseTime: 'soon',
+};
+
+export const sellerById = (id: string): Seller =>
+  remoteSellers.get(id) ??
+  SELLERS.find((s) => s.id === id) ??
+  (remoteSellers.size ? { ...UNKNOWN_SELLER, id } : SELLERS[0]);

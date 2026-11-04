@@ -129,9 +129,10 @@ App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView 
 | Motion  | **Framer Motion**                                        | Sheet transitions, micro-interactions                     |
 | Icons   | **Lucide**                                               | Consistent 2px iconography                                |
 | Native  | **Capacitor 8**                                          | Wraps the same build into an Android APK                  |
-| Quality | `tsc --noEmit`, custom jsdom smoke test                  | Route-level render verification                           |
+| Backend | **Node 22** `node:http` + `node:sqlite`                  | Real API with zero dependencies, one-file deploy         |
+| Quality | `tsc`, jsdom smoke + flows, `node:test` API suite        | Every layer checked in CI                                 |
 
-No backend is required to run the demo — the store acts as an offline repository so every flow is fully functional. Swapping in a real API means replacing the store actions (`src/lib/store.ts`) with fetch calls; the shapes in `src/lib/types.ts` are already API-ready.
+No backend is required to run the demo — the store acts as an offline repository so every flow is fully functional. Build with `VITE_API_URL` and the same store syncs with the real API in `server/` (section 7).
 
 ---
 
@@ -170,6 +171,8 @@ src/
 │   ├── data.ts             # categories, dynamic fields, sellers, areas
 │   ├── seed.ts             # 16 realistic listings, chats, notifications
 │   ├── store.ts            # Zustand marketplace store + toasts
+│   ├── api.ts              # API client (active when VITE_API_URL is set)
+│   ├── sync.ts             # optimistic sync + polling between store and API
 │   ├── ai.ts               # pricing, description writer, title hints, ranking
 │   ├── hooks.ts            # seller resolution ("me" support)
 │   └── utils.ts            # INR formatting, time, image compression, share
@@ -181,9 +184,18 @@ public/
 ├── sw.js                   # offline shell + runtime caching
 ├── icons/                  # generated PNG/SVG icons
 └── images/                 # listing photography
+server/                     # REST API — node:http + node:sqlite, no dependencies
+├── index.js                # config from env, SMS sending, startup
+├── app.js                  # routes, auth, validation, notifications
+├── db.js                   # schema + demo seeding
+├── seed.json               # demo sellers/ads/reviews (npm run server:seed-json)
+└── test/api.test.js        # API test suite
 scripts/
 ├── make-icons.mjs          # dependency-free PNG icon generator (web + Android)
-└── smoke.mjs               # jsdom render test for every route
+├── make-keystore.sh        # Play Store signing key + CI secrets
+├── smoke.mjs               # jsdom render test for every route
+├── flows.mjs               # jsdom interaction flows
+└── sync-e2e.mjs            # app store + sync layer against a live API
 ```
 
 ---
@@ -203,22 +215,59 @@ All three get: deep links (`/ad/ad-3`, `/chats/…`) served by `index.html`, a n
 and basic security headers. Every production build stamps a new id into the service worker,
 so old offline caches are cleared automatically.
 
-To connect a hosted app to the backend (section 8), set the environment variable
+To connect a hosted app to the backend (section 7), set the environment variable
 `VITE_API_URL` (e.g. `https://bazaar-api.onrender.com`) in the host's project settings and redeploy.
 
-## 7. CI
+## 7. Backend (real accounts, ads and chat)
+
+`server/` is a complete REST API with **zero npm dependencies** — Node's built-in HTTP server
+and SQLite. Without it the app runs as an offline demo; build the app with `VITE_API_URL`
+and every screen talks to the server instead.
+
+```bash
+npm run server                    # http://localhost:8787  (demo OTP: 1234)
+VITE_API_URL=http://localhost:8787 npm run dev
+```
+
+| Area | What the server does |
+| --- | --- |
+| Sign-in | Phone + OTP (hashed, 5-min expiry, resend cooldown, 6/hour limit, 5 wrong tries), 60-day sessions |
+| Ads | Create / edit / publish drafts / delete, search & filters, view counts, boosts, price history |
+| Photos | `POST /api/uploads` — the app uploads compressed photos, the server stores and serves them |
+| Favourites | Per-account, with live save counts; price drops notify everyone watching |
+| Chat | Buyer ↔ seller threads, offers, read receipts; the app polls `/api/updates` every 5 s |
+| Trust | Reviews (one per buyer, updates the seller's rating), reports, two-way blocking |
+| Demo data | A fresh database is seeded with the same 16 listings and 5 sellers; demo sellers auto-reply |
+
+**Sending real OTP SMS** — set either `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM`,
+or `SMS_WEBHOOK_URL` (+ `SMS_WEBHOOK_TOKEN`) to forward `{phone, code, message}` to any Indian
+SMS gateway (MSG91, Fast2SMS…). With neither, production refuses OTP requests; for a public demo
+set `OTP_DEV_CODE=1234`. All settings are listed at the top of `server/index.js`.
+
+**Deploying the API**
+
+- **Render**: New → Blueprint → this repo. `render.yaml` creates the service with a persistent
+  disk and a generated `OTP_SECRET`.
+- **Anywhere with Docker** (Railway, Fly.io, a VPS): `docker build -t bazaar-api .` and run it with
+  a volume on `/data`.
+
+Then put the API's https URL in `VITE_API_URL` — in your web host's settings, and as a repository
+**variable** (Settings → Secrets and variables → Actions → Variables) so CI builds the APK and the
+signed release against it. The Android app needs an **https** URL.
+
+## 8. CI
 
 `.github/workflows/ci.yml` runs two jobs on every push and pull request:
 
 | Job             | What it does                                                                                      |
 | --------------- | ------------------------------------------------------------------------------------------------- |
-| **Web checks**  | `npm ci` → `tsc` → 20-route smoke → interaction flows → production build → uploads `web-build` |
+| **Web checks**  | `npm ci` → `tsc` → 20-route smoke → interaction flows → API tests → app↔API sync test → production build → uploads `web-build` |
 | **Android APK** | JDK 21 + Android SDK 36 → `cap sync` → `./gradlew assembleDebug` → uploads `bazaar-debug-apk`     |
 | **Release** (`release.yml`, on `v*` tags) | signed `bundleRelease` + `assembleRelease` → signature check → GitHub Release |
 
 Both jobs currently pass in ~2 minutes.
 
-## 8. Scripts
+## 9. Scripts
 
 ```bash
 npm run dev         # Vite dev server on 0.0.0.0:5173
@@ -228,7 +277,11 @@ npm run typecheck   # tsc --noEmit
 
 npm run smoke       # render every route in jsdom (guest + signed-in), assert no errors
 npm run flows       # drive real UI flows: sign-in → post → boost → chat → filters → dark mode
-npm run verify      # typecheck + smoke + flows + build  ← the full gate
+npm run server      # API on :8787 (server:dev restarts on changes)
+npm run server:test # 13 API tests (auth, ads, chat, reviews, blocks, uploads)
+npm run test:sync   # runs the app's real store + sync layer against a live API
+npm run keystore    # create the Play Store signing key
+npm run verify      # typecheck + smoke + flows + API + sync + build  ← the full gate
 npm run icons       # regenerate web + Android launcher icons
 ```
 
@@ -239,17 +292,17 @@ props, bad routes and runtime errors without a browser binary.
 
 ---
 
-## 9. Making it production-ready
+## 10. What's next
 
-The demo is intentionally backend-free. To ship for real:
+Done: backend with real accounts, OTP, photos, chat, reviews and blocking; signed releases;
+hosting. Natural next steps as the marketplace grows:
 
-1. **API + DB** (Postgres/Prisma or Firebase) behind the store actions; add image uploads to S3/Cloudinary.
-2. **Real auth** — phone OTP via MSG91/Twilio, refresh tokens, device sessions.
-3. **Realtime chat** — WebSockets or Firestore; attachments, push notifications (FCM/APNs).
-4. **Payments & escrow** — Razorpay/Stripe for boosts and Safe Pay.
-5. **Maps & geo** — Mapbox/Google Places for precise distance and radius search.
-6. **Moderation** — image/text classifiers, duplicate detection, admin review queue.
-7. **Server-side AI** — swap `src/lib/ai.ts` heuristics for an LLM endpoint for descriptions and price models.
+1. **Payments** — Razorpay for boosts (the hook is marked in `POST /api/ads/:id/boost`).
+2. **Push notifications** — FCM via `@capacitor/push-notifications`, so replies arrive with the app closed.
+3. **Scale** — move SQLite to Postgres and photos to S3/Cloudinary once one server isn't enough.
+4. **Moderation** — an admin view over the `reports` table; image/text classifiers.
+5. **Maps & geo** — real coordinates and radius search instead of neighbourhood centroids.
+6. **Server-side AI** — swap `src/lib/ai.ts` heuristics for an LLM endpoint.
 
 ---
 
