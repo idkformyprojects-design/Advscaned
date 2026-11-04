@@ -303,6 +303,7 @@ function listenPrivate(user: User) {
     ),
     onSnapshot(
       query(collection(db, 'chats'), where('participants', 'array-contains', user.uid), orderBy('lastMessageAt', 'desc')),
+      { includeMetadataChanges: true },
       (snap) => {
         const seen = new Set<string>();
         snap.docs.forEach((d) => {
@@ -310,7 +311,9 @@ function listenPrivate(user: User) {
           const other = c.buyerId === user.uid ? c.sellerId : c.buyerId;
           seen.add(d.id);
           chatMeta.set(d.id, { adId: c.adId, other, lastMessageAt: c.lastMessageAt ?? 0 });
-          if (!messageUnsubs.has(d.id)) {
+          // Wait until the chat exists on the server: the messages rule reads the chat doc,
+          // so listening during our own pending create would be refused.
+          if (!messageUnsubs.has(d.id) && !d.metadata.hasPendingWrites) {
             messageUnsubs.set(
               d.id,
               onSnapshot(
@@ -337,6 +340,12 @@ function listenPrivate(user: User) {
                     }),
                   );
                   publishChats();
+                },
+                () => {
+                  // Refused (e.g. chat still being created): drop it so the next chat
+                  // snapshot attaches again.
+                  messageUnsubs.get(d.id)?.();
+                  messageUnsubs.delete(d.id);
                 },
               ),
             );

@@ -1,0 +1,115 @@
+name: Deploy to Firebase
+
+# Publishes security rules, indexes, Cloud Functions and the website to your Firebase project.
+# Run it from GitHub → Actions → "Deploy to Firebase" → Run workflow.
+#
+# Needs (GitHub → Settings → Secrets and variables → Actions):
+#   secret   FIREBASE_SERVICE_ACCOUNT   service-account JSON key (never commit it)
+#   variable FIREBASE_PROJECT_ID        e.g. bazaar-12345
+#   variable VITE_FIREBASE_CONFIG       the web-app config JSON from the Firebase console
+#   variable ADMIN_EMAILS               Google emails allowed to moderate (comma-separated)
+# Optional:
+#   variable RAZORPAY_KEY_ID + secrets RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET → paid boosts
+#   variables VITE_SUPPORT_EMAIL, VITE_GRIEVANCE_NAME, VITE_LEGAL_NAME, VITE_LEGAL_ADDRESS
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Add the demo listings if the database is empty
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check settings
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          CFG: ${{ vars.VITE_FIREBASE_CONFIG }}
+        run: |
+          missing=""
+          [ -n "$SA" ] || missing="$missing secret:FIREBASE_SERVICE_ACCOUNT"
+          [ -n "$PROJECT" ] || missing="$missing variable:FIREBASE_PROJECT_ID"
+          [ -n "$CFG" ] || missing="$missing variable:VITE_FIREBASE_CONFIG"
+          if [ -n "$missing" ]; then echo "::error::Missing:$missing"; exit 1; fi
+
+      - name: Service account credentials
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          npm ci || npm install --no-audit --no-fund
+          npm --prefix functions install --no-audit --no-fund
+
+      - name: Build website
+        env:
+          VITE_FIREBASE_CONFIG: ${{ vars.VITE_FIREBASE_CONFIG }}
+          VITE_SUPPORT_EMAIL: ${{ vars.VITE_SUPPORT_EMAIL }}
+          VITE_GRIEVANCE_NAME: ${{ vars.VITE_GRIEVANCE_NAME }}
+          VITE_LEGAL_NAME: ${{ vars.VITE_LEGAL_NAME }}
+          VITE_LEGAL_ADDRESS: ${{ vars.VITE_LEGAL_ADDRESS }}
+        run: npm run build
+
+      - name: Function settings
+        env:
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+          RAZORPAY_KEY_ID: ${{ vars.RAZORPAY_KEY_ID }}
+        run: |
+          printf 'ADMIN_EMAILS=%s\nRAZORPAY_KEY_ID=%s\n' "$ADMIN_EMAILS" "$RAZORPAY_KEY_ID" > "functions/.env.$PROJECT"
+
+      # Functions declare these secrets, so they must exist before deploy. Without Razorpay
+      # they hold a placeholder and payments stay off (RAZORPAY_KEY_ID empty).
+      - name: Function secrets
+        env:
+          KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+        run: |
+          set_secret() {
+            printf '%s' "${2:-not-configured}" | npx -y firebase-tools@latest functions:secrets:set "$1" \
+              --project "$PROJECT" --data-file - --non-interactive --force
+          }
+          set_secret RAZORPAY_KEY_SECRET "$KEY_SECRET"
+          set_secret RAZORPAY_WEBHOOK_SECRET "$WEBHOOK_SECRET"
+
+      - name: Deploy rules, indexes, functions and hosting
+        run: >
+          npx -y firebase-tools@latest deploy
+          --project "$PROJECT"
+          --only firestore,storage,functions,hosting
+          --non-interactive --force
+
+      - name: Seed demo listings (only if the database is empty)
+        if: inputs.seed
+        working-directory: functions
+        env:
+          GCLOUD_PROJECT: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: node scripts/seed.mjs
+
+      - name: Publish public config
+        run: |
+          echo "Website: https://$PROJECT.web.app"
+          echo "Privacy policy (for Play Console): https://$PROJECT.web.app/legal/privacy"
+          echo "Account deletion (for Play Console): https://$PROJECT.web.app/legal/delete-account"
+
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

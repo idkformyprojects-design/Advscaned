@@ -70,7 +70,7 @@ try {
     'guest sees the live marketplace from Firestore',
   );
   check(S().user === null, 'guest is signed out');
-  check(await until(() => S().serverConfig?.payments === true), 'public config (payments) loaded');
+  check(await until(() => S().serverConfig != null), 'public config loaded');
 
   /* ---------------- Google sign-in + onboarding, like the Login screen ---------------- */
   const fb = await backend.loadFirebase();
