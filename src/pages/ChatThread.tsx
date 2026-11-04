@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  Ban,
   BadgeCheck,
   ChevronRight,
+  Flag,
   ImagePlus,
   Info,
   MoreVertical,
@@ -14,7 +16,7 @@ import {
 import { TopBar } from '../components/TopBar';
 import { AdThumb } from '../components/AdCard';
 import { Avatar, EmptyState, Sheet } from '../components/ui';
-import { useStore } from '../lib/store';
+import { toast, useStore } from '../lib/store';
 import { useSeller } from '../lib/hooks';
 import { quickReplies } from '../lib/ai';
 import { cn, clockTime, inr, vibrate } from '../lib/utils';
@@ -31,6 +33,12 @@ export default function ChatThread() {
   const [menu, setMenu] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const blockSeller = useStore((s) => s.blockSeller);
+  const unblockSeller = useStore((s) => s.unblockSeller);
+  const report = useStore((s) => s.report);
+  const blocked = useStore((s) => (chat ? s.blockedSellers.includes(chat.sellerId) : false));
   const endRef = useRef<HTMLDivElement>(null);
 
   const seller = useSeller(chat?.sellerId ?? 'u1');
@@ -203,6 +211,20 @@ export default function ChatThread() {
       </div>
 
       {/* quick replies + composer */}
+      {blocked ? (
+        <div
+          className="border-t px-4 py-3 text-center text-[12.5px] text-muted"
+          style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
+        >
+          You blocked this seller.{' '}
+          <button
+            onClick={() => unblockSeller(chat.sellerId)}
+            className="font-bold text-brand-600 dark:text-brand-400"
+          >
+            Unblock
+          </button>
+        </div>
+      ) : (
       <div
         className="border-t px-3 pb-2 pt-2 backdrop-blur-xl"
         style={{
@@ -257,6 +279,7 @@ export default function ChatThread() {
           </button>
         </form>
       </div>
+      )}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Chat options">
         <div className="space-y-1.5">
@@ -288,11 +311,88 @@ export default function ChatThread() {
           <button
             onClick={() => {
               setMenu(false);
-              send('This item is no longer available, thanks!');
+              setReportOpen(true);
             }}
-            className="flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-medium text-rose-600 hairline"
+            className="flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-medium hairline"
           >
-            Report / block seller <ShieldAlert size={15} />
+            Report seller <Flag size={15} className="text-muted" />
+          </button>
+          {blocked ? (
+            <button
+              onClick={() => {
+                setMenu(false);
+                unblockSeller(chat.sellerId);
+                toast(`${seller.name.split(' ')[0]} unblocked`, 'info');
+              }}
+              className="flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-medium hairline"
+            >
+              Unblock seller <Ban size={15} className="text-muted" />
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setMenu(false);
+                setBlockOpen(true);
+              }}
+              className="flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-medium text-rose-600 hairline"
+            >
+              Block seller <Ban size={15} />
+            </button>
+          )}
+        </div>
+      </Sheet>
+
+      <Sheet open={reportOpen} onClose={() => setReportOpen(false)} title="Report seller">
+        <p className="mb-3 text-[12.5px] text-muted">
+          Reports are private — {seller.name.split(' ')[0]} won't be told who reported them.
+        </p>
+        <div className="space-y-1.5">
+          {[
+            'Asked for advance payment',
+            'Asked for OTP or UPI PIN',
+            'Fake or misleading item',
+            'Abusive or harassing messages',
+            'Spam',
+          ].map((reason) => (
+            <button
+              key={reason}
+              onClick={() => {
+                report('seller', chat.sellerId, reason);
+                setReportOpen(false);
+                toast('Thanks — our trust team will review this within 24h', 'success');
+                setBlockOpen(true);
+              }}
+              className="flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left text-[13.5px] font-medium hairline"
+            >
+              {reason} <ChevronRight size={15} className="text-muted" />
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
+      <Sheet
+        open={blockOpen && !blocked}
+        onClose={() => setBlockOpen(false)}
+        title={`Block ${seller.name.split(' ')[0]}?`}
+      >
+        <p className="text-[13px] leading-relaxed text-muted">
+          You won't receive messages from this seller and their ads will be hidden from your
+          searches. You can unblock them anytime from Account.
+        </p>
+        <div className="mt-4 flex gap-2">
+          <button onClick={() => setBlockOpen(false)} className="btn btn-outline flex-1">
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              blockSeller(chat.sellerId);
+              setBlockOpen(false);
+              toast(`${seller.name.split(' ')[0]} blocked`, 'info');
+              navigate('/chats');
+            }}
+            className="btn flex-1 bg-rose-600 text-white"
+          >
+            Block
           </button>
         </div>
       </Sheet>

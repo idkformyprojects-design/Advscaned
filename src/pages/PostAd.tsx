@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
-import { Sheet, Spinner, Stepper, Toggle } from '../components/ui';
+import { EmptyState, Sheet, Spinner, Stepper, Toggle } from '../components/ui';
 import { AREAS, CATEGORIES, categoryById, CONDITIONS } from '../lib/data';
 import { suggestPrice, suggestTitles, writeDescription } from '../lib/ai';
 import { toast, useStore } from '../lib/store';
@@ -31,20 +31,32 @@ export default function PostAd() {
   const ads = useStore((s) => s.ads);
   const user = useStore((s) => s.user);
   const createAd = useStore((s) => s.createAd);
+  const updateAd = useStore((s) => s.updateAd);
   const area = useStore((s) => s.area);
 
-  const [step, setStep] = useState(0);
-  const [category, setCategory] = useState<CategoryId | null>(null);
+  // Editing an existing ad (e.g. finishing a draft) when the route has an id.
+  const { id: editId } = useParams();
+  const editing = useMemo(
+    () => (editId ? ads.find((a) => a.id === editId && a.sellerId === 'me') : undefined),
+    // Only resolve once — later store updates must not reset the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editId],
+  );
+
+  const [step, setStep] = useState(editing ? 1 : 0);
+  const [category, setCategory] = useState<CategoryId | null>(editing?.category ?? null);
   const [catQuery, setCatQuery] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [condition, setCondition] = useState<Condition>('good');
-  const [attributes, setAttributes] = useState<Record<string, string>>({});
-  const [negotiable, setNegotiable] = useState(true);
-  const [delivery, setDelivery] = useState(false);
-  const [locality, setLocality] = useState(area);
+  const [images, setImages] = useState<string[]>(editing?.images ?? []);
+  const [title, setTitle] = useState(editing?.title ?? '');
+  const [description, setDescription] = useState(editing?.description ?? '');
+  const [price, setPrice] = useState(editing?.price ? String(editing.price) : '');
+  const [condition, setCondition] = useState<Condition>(editing?.condition ?? 'good');
+  const [attributes, setAttributes] = useState<Record<string, string>>(
+    editing?.attributes ?? {},
+  );
+  const [negotiable, setNegotiable] = useState(editing?.negotiable ?? true);
+  const [delivery, setDelivery] = useState(editing?.delivery ?? false);
+  const [locality, setLocality] = useState(editing?.area ?? area);
   const [busy, setBusy] = useState(false);
   const [aiSheet, setAiSheet] = useState(false);
   const [locSheet, setLocSheet] = useState(false);
@@ -109,6 +121,40 @@ export default function PostAd() {
 
   const publish = (asDraft = false) => {
     if (!category) return;
+    if (!asDraft && (title.trim().length < 8 || !(Number(price) > 0))) {
+      toast('Add a title (8+ characters) and a price before publishing', 'error');
+      setStep(1);
+      return;
+    }
+    if (editing) {
+      const wasDraft = editing.status === 'draft';
+      updateAd(editing.id, {
+        title: title.trim(),
+        description:
+          description.trim() ||
+          `${title.trim()} in ${condition} condition. Contact me for more details.`,
+        price: Number(price) || 0,
+        category,
+        condition,
+        images,
+        area: locality,
+        negotiable,
+        delivery,
+        attributes,
+        status: asDraft ? 'draft' : editing.status === 'sold' ? 'sold' : 'active',
+        // A draft going live counts as freshly posted.
+        createdAt: wasDraft && !asDraft ? Date.now() : editing.createdAt,
+      });
+      vibrate(20);
+      if (asDraft) {
+        toast('Draft updated', 'info');
+        navigate('/myads');
+      } else {
+        toast(wasDraft ? 'Your ad is live 🎉' : 'Ad updated', 'success');
+        navigate(`/ad/${editing.id}`);
+      }
+      return;
+    }
     const id = uid('ad');
     const ad: Ad = {
       id,
@@ -146,11 +192,26 @@ export default function PostAd() {
     navigate(`/ad/${id}`);
   };
 
+  if (editId && !editing) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <TopBar back="/myads" title="Edit ad" />
+        <EmptyState
+          icon={<X size={26} />}
+          title="Ad not found"
+          body="It may have been deleted, or it belongs to another seller."
+          action="Back to My ads"
+          onAction={() => navigate('/myads')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <TopBar
-        back={step === 0 ? '/' : undefined}
-        title={STEPS[step]}
+        back={step === 0 ? '/' : editing && step === 1 ? '/myads' : undefined}
+        title={editing ? `Edit ad · ${STEPS[step]}` : STEPS[step]}
         subtitle={`Step ${step + 1} of ${STEPS.length}`}
         right={<Stepper step={step + 1} total={STEPS.length} />}
       />
@@ -573,7 +634,8 @@ export default function PostAd() {
                 Save draft
               </button>
               <button onClick={() => publish(false)} className="btn btn-primary flex-[1.6]">
-                <Rocket size={17} /> Publish ad
+                <Rocket size={17} />{' '}
+                {editing && editing.status !== 'draft' ? 'Save changes' : 'Publish ad'}
               </button>
             </div>
           </div>

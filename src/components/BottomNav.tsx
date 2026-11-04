@@ -8,7 +8,8 @@ export function BottomNav() {
   const chats = useStore((s) => s.chats);
   const user = useStore((s) => s.user);
   const unread = chats.reduce(
-    (n, c) => n + c.messages.filter((m) => m.senderId !== 'me' && !m.read).length,
+    (n, c) =>
+      c.archived ? n : n + c.messages.filter((m) => m.senderId !== 'me' && !m.read).length,
     0,
   );
 

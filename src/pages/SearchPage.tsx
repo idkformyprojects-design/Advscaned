@@ -19,7 +19,7 @@ import { AdCard } from '../components/AdCard';
 import { TopBar } from '../components/TopBar';
 import { EmptyState, Sheet, Toggle } from '../components/ui';
 import { MapView } from '../components/MapView';
-import { AREAS, CATEGORIES, categoryById } from '../lib/data';
+import { AREAS, CATEGORIES, categoryById, sellerById } from '../lib/data';
 import { TRENDING_SEARCHES } from '../lib/seed';
 import { toast, useStore } from '../lib/store';
 import type { CategoryId, Condition, Filters } from '../lib/types';
@@ -47,6 +47,7 @@ export default function SearchPage() {
   const ads = useStore((s) => s.ads);
   const area = useStore((s) => s.area);
   const addSavedSearch = useStore((s) => s.addSavedSearch);
+  const blocked = useStore((s) => s.blockedSellers);
 
   const q = params.get('q') ?? '';
   const cat = (params.get('cat') as CategoryId | null) ?? undefined;
@@ -103,7 +104,7 @@ export default function SearchPage() {
     (withPhotos ? 1 : 0);
 
   const results = useMemo(() => {
-    let list = ads.filter((a) => a.status === 'active');
+    let list = ads.filter((a) => a.status === 'active' && !blocked.includes(a.sellerId));
     if (cat) list = list.filter((a) => a.category === cat);
     if (q) {
       list = rankAds(list, q, area);
@@ -112,7 +113,8 @@ export default function SearchPage() {
     if (maxPrice) list = list.filter((a) => a.price <= maxPrice);
     if (conditions.length) list = list.filter((a) => conditions.includes(a.condition));
     if (maxDistance) list = list.filter((a) => a.distanceKm <= maxDistance);
-    if (verifiedOnly) list = list.filter((a) => ['u1', 'u2', 'u3', 'u4'].includes(a.sellerId));
+    if (verifiedOnly)
+      list = list.filter((a) => a.sellerId === 'me' || sellerById(a.sellerId).verified);
     if (withPhotos) list = list.filter((a) => a.images.length > 0);
 
     switch (sort) {
@@ -141,6 +143,7 @@ export default function SearchPage() {
     withPhotos,
     sort,
     area,
+    blocked,
   ]);
 
   const suggestions = useMemo(() => {

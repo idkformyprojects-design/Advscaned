@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { Avatar, Sheet, Toggle } from '../components/ui';
-import { AREAS } from '../lib/data';
+import { AREAS, sellerById } from '../lib/data';
 import { toast, useStore } from '../lib/store';
 import { cn } from '../lib/utils';
 
@@ -40,6 +40,8 @@ export default function Profile() {
   const setArea = useStore((s) => s.setArea);
   const logout = useStore((s) => s.logout);
   const resetDemo = useStore((s) => s.resetDemo);
+  const blocked = useStore((s) => s.blockedSellers);
+  const unblockSeller = useStore((s) => s.unblockSeller);
   const navigate = useNavigate();
 
   const [locOpen, setLocOpen] = useState(false);
@@ -226,6 +228,29 @@ export default function Profile() {
           <Row icon={HelpCircle} label="Help centre" onClick={() => setHelpOpen(true)} />
           <Row icon={Info} label="About Bazaar" hint="v1.0.0" onClick={() => setHelpOpen(true)} />
         </Section>
+
+        {blocked.length > 0 && (
+          <Section title="Blocked sellers">
+            {blocked.map((id) => {
+              const b = sellerById(id);
+              return (
+                <div key={id} className="flex items-center gap-3 px-3.5 py-3">
+                  <Avatar name={b.name} color={b.avatarColor} size={32} />
+                  <span className="flex-1 text-[13.5px] font-semibold">{b.name}</span>
+                  <button
+                    onClick={() => {
+                      unblockSeller(id);
+                      toast(`${b.name.split(' ')[0]} unblocked`, 'info');
+                    }}
+                    className="rounded-lg bg-ink-100 px-3 py-1.5 text-[11.5px] font-bold dark:bg-white/10"
+                  >
+                    Unblock
+                  </button>
+                </div>
+              );
+            })}
+          </Section>
+        )}
 
         {/* Account */}
         <Section title="Account">

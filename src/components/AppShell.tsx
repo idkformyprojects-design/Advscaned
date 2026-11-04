@@ -57,7 +57,8 @@ function DesktopHeader() {
   const chats = useStore((s) => s.chats);
   const unreadN = notifications.filter((n) => !n.read).length;
   const unreadC = chats.reduce(
-    (n, c) => n + c.messages.filter((m) => m.senderId !== 'me' && !m.read).length,
+    (n, c) =>
+      c.archived ? n : n + c.messages.filter((m) => m.senderId !== 'me' && !m.read).length,
     0,
   );
 

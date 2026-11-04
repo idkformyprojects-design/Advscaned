@@ -42,6 +42,7 @@ export default function AdDetail() {
   const startChat = useStore((s) => s.startChat);
   const sendMessage = useStore((s) => s.sendMessage);
   const chats = useStore((s) => s.chats);
+  const reportAd = useStore((s) => s.report);
 
   const ad = ads.find((a) => a.id === id);
   const [idx, setIdx] = useState(0);
@@ -649,6 +650,7 @@ export default function AdDetail() {
             <button
               key={r}
               onClick={() => {
+                reportAd('ad', ad.id, r);
                 setSheet(null);
                 toast('Thanks — our trust team will review this ad', 'success');
               }}

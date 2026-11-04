@@ -80,7 +80,11 @@ export default function Home() {
     return () => window.clearInterval(t);
   }, []);
 
-  const active = useMemo(() => ads.filter((a) => a.status === 'active'), [ads]);
+  const blocked = useStore((s) => s.blockedSellers);
+  const active = useMemo(
+    () => ads.filter((a) => a.status === 'active' && !blocked.includes(a.sellerId)),
+    [ads, blocked],
+  );
 
   const feed = useMemo(() => {
     const list = [...active];

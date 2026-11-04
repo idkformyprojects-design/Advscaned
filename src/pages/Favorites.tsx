@@ -1,5 +1,5 @@
 import { Heart, BellPlus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { AdCard } from '../components/AdCard';
 import { EmptyState } from '../components/ui';
@@ -8,6 +8,7 @@ import { useStore } from '../lib/store';
 export default function Favorites() {
   const favorites = useStore((s) => s.favorites);
   const ads = useStore((s) => s.ads);
+  const navigate = useNavigate();
   const saved = favorites.map((id) => ads.find((a) => a.id === id)).filter(Boolean) as typeof ads;
 
   return (
@@ -32,7 +33,7 @@ export default function Favorites() {
           title="Nothing saved yet"
           body="Tap the heart on any ad to keep it here. We'll tell you if the price drops."
           action="Find something you love"
-          onAction={() => window.location.assign('/search')}
+          onAction={() => navigate('/search')}
         />
       ) : (
         <div className="grid grid-cols-2 gap-3 px-4 py-4 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">

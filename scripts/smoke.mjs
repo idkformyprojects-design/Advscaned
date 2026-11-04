@@ -24,6 +24,7 @@ const routes = [
   '/profile',
   '/saved',
   '/post',
+  '/post/ad-1',
   '/nope',
 ];
 

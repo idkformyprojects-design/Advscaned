@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bell, BellOff, Search, Trash2, TrendingUp } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { EmptyState, Toggle } from '../components/ui';
@@ -11,6 +11,7 @@ export default function SavedSearchesPage() {
   const remove = useStore((s) => s.removeSavedSearch);
   const toggleAlerts = useStore((s) => s.toggleSearchAlerts);
   const ads = useStore((s) => s.ads);
+  const navigate = useNavigate();
 
   const matchCount = (q: string, cat?: string, max?: number) =>
     ads.filter(
@@ -31,7 +32,7 @@ export default function SavedSearchesPage() {
           title="No saved searches"
           body="Search for something, then tap “Save search” to get alerts for new matches."
           action="Start searching"
-          onAction={() => window.location.assign('/search')}
+          onAction={() => navigate('/search')}
         />
       ) : (
         <div className="space-y-2.5 px-4 py-4">

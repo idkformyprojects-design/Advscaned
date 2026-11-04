@@ -14,7 +14,6 @@ const config: CapacitorConfig = {
   appId: 'com.bazaar.marketplace',
   appName: 'Bazaar',
   webDir: 'dist',
-  bundledWebRuntime: false,
   android: {
     allowMixedContent: false,
     captureInput: true,

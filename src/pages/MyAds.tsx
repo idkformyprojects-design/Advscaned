@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowDownRight,
   BarChart3,
@@ -7,7 +7,9 @@ import {
   Eye,
   Heart,
   PackageOpen,
+  PenLine,
   Plus,
+  Rocket,
   Sparkles,
   Trash2,
   Zap,
@@ -33,6 +35,7 @@ export default function MyAds() {
   const deleteAd = useStore((s) => s.deleteAd);
   const boostAd = useStore((s) => s.boostAd);
   const dropPrice = useStore((s) => s.dropPrice);
+  const navigate = useNavigate();
   const [tab, setTab] = useState<AdStatus | 'all'>('all');
   const [boostTarget, setBoostTarget] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -118,7 +121,7 @@ export default function MyAds() {
                 : 'Turn unused things into cash — it takes less than a minute to post your first ad.'
             }
             action={mine.length ? undefined : 'Post an ad'}
-            onAction={() => (window.location.href = '/post')}
+            onAction={() => navigate('/post')}
           />
         ) : (
           <div className="mt-3 space-y-2.5 pb-4">
@@ -170,7 +173,48 @@ export default function MyAds() {
                   </div>
                 </div>
 
+                {ad.status === 'draft' ? (
+                  <div className="mt-2.5 flex gap-1.5 border-t pt-2.5 hairline">
+                    <Link
+                      to={`/post/${ad.id}`}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-ink-100 py-2 text-[11.5px] font-bold dark:bg-white/10"
+                    >
+                      <PenLine size={12} /> Edit draft
+                    </Link>
+                    <button
+                      onClick={() => {
+                        if (ad.title.trim().length < 8 || !(ad.price > 0)) {
+                          toast('Finish the title and price first', 'error');
+                          navigate(`/post/${ad.id}`);
+                          return;
+                        }
+                        updateAd(ad.id, { status: 'active', createdAt: Date.now() });
+                        toast('Your ad is live 🎉', 'success', {
+                          label: 'View',
+                          to: `/ad/${ad.id}`,
+                        });
+                      }}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-brand-600 py-2 text-[11.5px] font-bold text-white"
+                    >
+                      <Rocket size={12} /> Publish
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(ad.id)}
+                      aria-label="Delete ad"
+                      className="grid w-9 place-items-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ) : (
                 <div className="mt-2.5 flex gap-1.5 border-t pt-2.5 hairline">
+                  <Link
+                    to={`/post/${ad.id}`}
+                    aria-label="Edit ad"
+                    className="grid w-9 place-items-center rounded-lg bg-ink-100 dark:bg-white/10"
+                  >
+                    <PenLine size={13} />
+                  </Link>
                   <button
                     onClick={() => setBoostTarget(ad.id)}
                     disabled={ad.boosted}
@@ -208,6 +252,7 @@ export default function MyAds() {
                     <Trash2 size={13} />
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

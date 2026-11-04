@@ -302,6 +302,54 @@ async function main() {
     'seller auto-reply arrives',
   );
 
+  /* --------------------------- chat search + block ----------------------- */
+  await goto('/chats');
+  await type('Rohan', { placeholder: 'Search by seller' });
+  log(text().includes('Rohan Mehta'), 'chat search matches seller name');
+  log(!text().includes('Priya Nair'), 'chat search hides non-matching sellers');
+  await type('', { placeholder: 'Search by seller' });
+
+  await goto('/ad/ad-3');
+  await click('Chat', { exact: true, wait: 600 });
+  await click('Chat options', { wait: 320 });
+  await click('Report seller', { wait: 320 });
+  log(text().includes('Asked for advance payment'), 'report sheet lists reasons');
+  await click('Spam', { wait: 400 });
+  log(text().includes('Block Priya?'), 'block prompt follows a report');
+  await click('Block', { exact: true, wait: 500 });
+  log(window.location.pathname === '/chats', 'blocking returns to the chat list');
+  log(!text().includes('Priya Nair'), 'blocked seller hidden from chats');
+  await goto('/search?q=macbook');
+  log(!text().includes('MacBook Air M1'), "blocked seller's ads hidden from search");
+  await goto('/profile');
+  log(text().includes('Blocked sellers'), 'account lists blocked sellers');
+  await click('Unblock', { exact: true, wait: 300 });
+  log(!text().includes('Blocked sellers'), 'seller unblocked from account');
+
+  /* ------------------------------ draft → live --------------------------- */
+  await goto('/post');
+  await click('Mobiles', { wait: 350 });
+  await type('Pixel 7 draft for testing', { placeholder: 'brand' });
+  await type('18000', { placeholder: '0' });
+  await click('Continue', { wait: 350 });
+  await click('Continue', { wait: 350 });
+  await click('Save draft', { wait: 500 });
+  log(text().includes('Pixel 7 draft for testing'), 'draft saved to My ads');
+  await click('Edit draft', { wait: 450 });
+  log(text().includes('Edit ad'), 'draft opens in the editor');
+  const titleInput = [...document.querySelectorAll('input')].find(
+    (i) => i.value === 'Pixel 7 draft for testing',
+  );
+  log(!!titleInput, 'editor is pre-filled with the draft');
+  await type('Pixel 7 128GB finished draft', { placeholder: 'brand' });
+  await click('Continue', { wait: 350 });
+  await click('Continue', { wait: 350 });
+  await click('Publish ad', { wait: 600 });
+  log(
+    window.location.pathname.startsWith('/ad/') && text().includes('Pixel 7 128GB finished draft'),
+    'finished draft publishes as a live ad',
+  );
+
   /* -------------------------------- filters ------------------------------ */
   await goto('/search?cat=mobiles');
   await click('Filters', { wait: 300 });

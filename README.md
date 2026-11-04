@@ -81,13 +81,14 @@ App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView 
 
 - **Chat threads** with ad context, quick replies, typing indicator, read receipts, unread badges and day separators.
 - **Make an offer** flow (pre-filled suggestions) that posts a structured offer message.
-- **Phone reveal** with masking, plus safety reminders and reporting.
+- **Phone reveal** with masking, safety reminders, **report seller** (reason picker) and **block / unblock** (hides their chats and ads).
+- Chat list search across seller names, item titles and messages.
 - Chat list with search, previews and per-chat badges.
 
 ### Account & growth
 
 - **Phone + OTP sign-in** (simulated), name + area onboarding, guest browsing with auth gates.
-- **My ads** dashboard: views/saves/live stats, mark sold, relist, delete, drafts, and **lower-price with suggested cuts**.
+- **My ads** dashboard: views/saves/live stats, edit any ad, finish & publish drafts, mark sold, relist, delete, and **lower-price with suggested cuts**.
 - **Seller insights**: 7/30-day view trend chart, unique buyers, save rate, buyer funnel (views → saves → chats → deals), per-ad sparklines with momentum, and ranked “what to do next” tips.
 - **Boost** flow (simulated checkout) → featured placement + notification.
 - **Saved ads**, **saved searches** with alert toggles and live match counts.
@@ -110,7 +111,7 @@ App id `com.bazaar.marketplace`, launcher icons, splash colours and the WebView 
 | Routing | **React Router 6**                                       | Nested shell + auth guards + shareable query state        |
 | Motion  | **Framer Motion**                                        | Sheet transitions, micro-interactions                     |
 | Icons   | **Lucide**                                               | Consistent 2px iconography                                |
-| Native  | **Capacitor 7**                                          | Wraps the same build into an Android APK                  |
+| Native  | **Capacitor 8**                                          | Wraps the same build into an Android APK                  |
 | Quality | `tsc --noEmit`, custom jsdom smoke test                  | Route-level render verification                           |
 
 No backend is required to run the demo — the store acts as an offline repository so every flow is fully functional. Swapping in a real API means replacing the store actions (`src/lib/store.ts`) with fetch calls; the shapes in `src/lib/types.ts` are already API-ready.
@@ -176,7 +177,7 @@ scripts/
 
 | Job             | What it does                                                                                      |
 | --------------- | ------------------------------------------------------------------------------------------------- |
-| **Web checks**  | `npm ci` → `tsc` → 19-route smoke → 41 interaction flows → production build → uploads `web-build` |
+| **Web checks**  | `npm ci` → `tsc` → 20-route smoke → interaction flows → production build → uploads `web-build` |
 | **Android APK** | JDK 21 + Android SDK 36 → `cap sync` → `./gradlew assembleDebug` → uploads `bazaar-debug-apk`     |
 
 Both jobs currently pass in ~2 minutes.
@@ -189,7 +190,7 @@ npm run build       # type-check + production build → dist/
 npm run preview     # serve the production build (service worker active)
 npm run typecheck   # tsc --noEmit
 
-npm run smoke       # render 18 routes in jsdom (guest + signed-in), assert no errors
+npm run smoke       # render every route in jsdom (guest + signed-in), assert no errors
 npm run flows       # drive real UI flows: sign-in → post → boost → chat → filters → dark mode
 npm run verify      # typecheck + smoke + flows + build  ← the full gate
 npm run icons       # regenerate web + Android launcher icons
@@ -197,7 +198,7 @@ npm run icons       # regenerate web + Android launcher icons
 
 `npm run flows` is a genuine interaction suite — it types into controlled inputs, opens
 sheets, publishes an ad, waits for the seller's auto-reply, applies filters and toggles dark
-mode, asserting the resulting DOM — including the price-drop flow and the insights dashboard. Both suites run on the real bundle, so they catch broken
+mode, asserting the resulting DOM — including the price-drop flow, insights dashboard, report/block, chat search and draft → publish. Both suites run on the real bundle, so they catch broken
 props, bad routes and runtime errors without a browser binary.
 
 ---

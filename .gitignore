@@ -16,3 +16,6 @@ ios
 
 # Deliverable archive (downloadable, not tracked)
 bazaar-marketplace.zip
+
+# TypeScript incremental build cache
+*.tsbuildinfo

@@ -54,6 +54,14 @@ export default function App() {
             }
           />
           <Route
+            path="post/:id"
+            element={
+              <RequireAuth>
+                <PostAd />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="chats"
             element={
               <RequireAuth>

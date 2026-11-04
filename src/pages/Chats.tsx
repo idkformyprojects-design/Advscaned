@@ -7,10 +7,13 @@ import { Avatar, EmptyState } from '../components/ui';
 import { useStore } from '../lib/store';
 import { useSeller } from '../lib/hooks';
 import { cn, dayLabel } from '../lib/utils';
+import { sellerById } from '../lib/data';
 
 export default function Chats() {
   const chats = useStore((s) => s.chats);
   const ads = useStore((s) => s.ads);
+  const navigate = useNavigate();
+  const blocked = useStore((s) => s.blockedSellers);
   const [q, setQ] = useState('');
 
   const rows = useMemo(() => {
@@ -19,19 +22,21 @@ export default function Chats() {
         const ad = ads.find((a) => a.id === c.adId);
         const last = c.messages[c.messages.length - 1];
         const unread = c.messages.filter((m) => m.senderId !== 'me' && !m.read).length;
-        return { chat: c, ad, last, unread };
+        const sellerName = sellerById(c.sellerId).name;
+        return { chat: c, ad, last, unread, sellerName };
       })
+      .filter((r) => !r.chat.archived && !blocked.includes(r.chat.sellerId))
       .filter((r) => {
-        if (!q.trim()) return true;
-        const sellerName = r.ad ? '' : '';
+        const term = q.trim().toLowerCase();
+        if (!term) return true;
         return (
-          (r.ad?.title ?? '').toLowerCase().includes(q.toLowerCase()) ||
-          (r.last?.text ?? '').toLowerCase().includes(q.toLowerCase()) ||
-          sellerName
+          (r.ad?.title ?? '').toLowerCase().includes(term) ||
+          (r.last?.text ?? '').toLowerCase().includes(term) ||
+          r.sellerName.toLowerCase().includes(term)
         );
       })
       .sort((a, b) => b.chat.lastMessageAt - a.chat.lastMessageAt);
-  }, [chats, ads, q]);
+  }, [chats, ads, q, blocked]);
 
   const totalUnread = chats.reduce(
     (n, c) => n + c.messages.filter((m) => m.senderId !== 'me' && !m.read).length,
@@ -55,7 +60,7 @@ export default function Chats() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search chats"
+            placeholder="Search by seller, item or message"
             className="input py-2.5 pl-10 text-[13.5px]"
           />
         </div>
@@ -66,13 +71,19 @@ export default function Chats() {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && q.trim() ? (
+        <EmptyState
+          icon={<Search size={26} />}
+          title="No chats match"
+          body={`Nothing found for “${q.trim()}”. Try a seller's name or the item.`}
+        />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={<MessageCircle size={26} />}
           title="No conversations yet"
           body="When you message a seller about an ad, the conversation shows up here."
           action="Browse ads"
-          onAction={() => window.location.assign('/search')}
+          onAction={() => navigate('/search')}
         />
       ) : (
         <div className="mt-2 divide-hair">

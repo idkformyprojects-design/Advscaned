@@ -39,6 +39,8 @@ interface AppState {
   area: string;
   onboarded: boolean;
   installedHintDismissed: boolean;
+  blockedSellers: string[];
+  reports: { id: string; targetType: 'ad' | 'seller'; targetId: string; reason: string; at: number }[];
 
   login: (name: string, phone: string, area?: string) => void;
   logout: () => void;
@@ -72,6 +74,10 @@ interface AppState {
   addSavedSearch: (s: Omit<SavedSearch, 'id' | 'createdAt'>) => void;
   removeSavedSearch: (id: string) => void;
   toggleSearchAlerts: (id: string) => void;
+
+  blockSeller: (sellerId: string) => void;
+  unblockSeller: (sellerId: string) => void;
+  report: (targetType: 'ad' | 'seller', targetId: string, reason: string) => void;
 
   resetDemo: () => void;
 }
@@ -123,6 +129,8 @@ export const useStore = create<AppState>()(
       area: 'Salt Lake',
       onboarded: false,
       installedHintDismissed: false,
+      blockedSellers: [],
+      reports: [],
 
       login: (name, phone, area) =>
         set((s) => ({
@@ -256,7 +264,7 @@ export const useStore = create<AppState>()(
 
         // Simulated seller presence — a real backend would push this over websockets.
         const chat = get().chats.find((c) => c.id === chatId);
-        if (!chat) return;
+        if (!chat || get().blockedSellers.includes(chat.sellerId)) return;
         const delay = 1200 + Math.random() * 1400;
         window.setTimeout(() => {
           const seller = sellerById(chat.sellerId);
@@ -345,6 +353,25 @@ export const useStore = create<AppState>()(
           ),
         })),
 
+      blockSeller: (sellerId) =>
+        set((s) => ({
+          blockedSellers: s.blockedSellers.includes(sellerId)
+            ? s.blockedSellers
+            : [...s.blockedSellers, sellerId],
+          chats: s.chats.map((c) => (c.sellerId === sellerId ? { ...c, archived: true } : c)),
+        })),
+
+      unblockSeller: (sellerId) =>
+        set((s) => ({
+          blockedSellers: s.blockedSellers.filter((id) => id !== sellerId),
+          chats: s.chats.map((c) => (c.sellerId === sellerId ? { ...c, archived: false } : c)),
+        })),
+
+      report: (targetType, targetId, reason) =>
+        set((s) => ({
+          reports: [{ id: uid('rp'), targetType, targetId, reason, at: Date.now() }, ...s.reports],
+        })),
+
       resetDemo: () =>
         set({
           ads: SEED_ADS,
@@ -354,6 +381,8 @@ export const useStore = create<AppState>()(
           savedSearches: SEED_SAVED_SEARCHES,
           reviews: SEED_REVIEWS,
           recentlyViewed: [],
+          blockedSellers: [],
+          reports: [],
         }),
     }),
     {
@@ -372,6 +401,8 @@ export const useStore = create<AppState>()(
         area: s.area,
         onboarded: s.onboarded,
         installedHintDismissed: s.installedHintDismissed,
+        blockedSellers: s.blockedSellers,
+        reports: s.reports,
       }),
     },
   ),
